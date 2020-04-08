@@ -41,27 +41,89 @@
 
 #include <rte_spinlock.h>
 #include "fs_tstamp.h"
-
-static volatile bool force_quit;
-
-int myapp_parse_args(int argc, char **argv);
+#include "fs_lpm_test.h"
 
 
-static void
-signal_handler(int signum)
-{
-	if (signum == SIGINT || signum == SIGTERM) {
-		printf("\n\nSignal %d received, preparing to exit...\n",
-				signum);
-		force_quit = true;
-	}
-}
+// GLOBAL DEFINITIONS REFERENCED BY TEST FUNCTIONS
+
+volatile bool g_force_quit;
+
+struct test_mode_struct {
+        int   (*setup)(void *);
+        int   (*main_loop)(void *);
+        int   (*print_results)(void *);
+        int   (*cleanup)(void *);
+};
+
+struct test_mode_struct g_tst_func;
 
 //  lock for printing to output if you need clean output
 rte_spinlock_t g_fs_print_lock = {0};
 
+
+
+// GLOBAL DEFINITION USED IN MAIN.C
+int g_test_selection = 1;  // fix this
+int myapp_parse_args(int argc, char **argv);
+
+
+//  DUMMY TEST FUNCTION
+int    dummy_setup( __attribute__((unused))void * arg);
+int     dummy_loop( __attribute__((unused))void * arg);
+int    dummy_print( __attribute__((unused))void * arg);
+int  dummy_cleanup( __attribute__((unused))void * arg);
+
+int dummy_setup( __attribute__((unused)) void * arg)
+{
+     int32_t x = -1 ;
+     if (arg != NULL ) x = *(int32_t *)arg;
+     printf("dummy test function %d\n",x);
+     return 0;
+}
+int dummy_loop( __attribute__((unused)) void * arg)
+{
+     int32_t x = -1 ;
+     if (arg != NULL ) x = *(int32_t *)arg;
+     printf("dummy loop function %d\n",x);
+     return 0;
+}
+int dummy_print(__attribute__((unused)) void * arg)
+{
+     int32_t x = -1 ;
+     if (arg != NULL ) x = *(int32_t *)arg;
+     printf("dummy print function %d\n",x);
+     return 0;
+}
+int dummy_cleanup(__attribute__((unused)) void * arg)
+{
+     int32_t x = -1 ;
+     if (arg != NULL ) x = *(int32_t *)arg;
+     printf("dummy cleanup function %d\n",x);
+     return 0;
+}
+
+struct test_mode_struct  tm_dummy = {
+      .setup         = dummy_setup,
+      .main_loop     = dummy_loop,
+      .print_results = dummy_print,
+      .cleanup       = dummy_cleanup,
+};
+
+
+
+
+
+
 // array of time stamps structures, 1 per core
 fs_time_stamp g_per_core_time_stamp[32]={0}; // per core time stamp
+
+
+struct test_mode_struct  tm_rwlock = {
+      .setup         = NULL,
+      .main_loop     = NULL,
+      .print_results = NULL,
+      .cleanup       = NULL,
+};
 
 
 /***********************************************************
@@ -108,7 +170,7 @@ int test_main_loop(__attribute__((unused)) void *dummy)
        {
 
           tstamp_start( p_per_core_time_stamp);
-          for( i = 0 ; (i < LOCK_LOOPS) && (!force_quit ) ; i ++)
+          for( i = 0 ; (i < LOCK_LOOPS) && (!g_force_quit ) ; i ++)
           {
                TestFunction();                            /*1*/
                TestFunction();                            /*2*/
@@ -143,8 +205,9 @@ int test_main_loop(__attribute__((unused)) void *dummy)
       }
 #endif
 
-        while (!force_quit) {
-            continue;
+        while (!g_force_quit) {
+            /*    PUT YOUR LOOPING TEST  CODE HERE */
+            do_lpm_test();
 
 
        }
@@ -159,6 +222,21 @@ int test_main_loop(__attribute__((unused)) void *dummy)
 }
 
 
+ /*
+  * Setup test function  methods.
+  */
+ static void
+ setup_test_funtions(void)
+ {
+         /* run the spinlock test. */
+         if ( g_test_selection  == 1)
+                 g_tst_func  = tm_rwlock;
+         /* Setup LPM lookup functions. */
+         else
+                 g_tst_func = tm_dummy;
+ }
+
+
 static int
 test_launch_one_lcore(__attribute__((unused)) void *dummy)
 {
@@ -168,7 +246,14 @@ test_launch_one_lcore(__attribute__((unused)) void *dummy)
 
 
 
-
+static void signal_handler(int signum)
+{
+	if (signum == SIGINT || signum == SIGTERM) {
+		printf("\n\nSignal %d received, preparing to exit...\n",
+				signum);
+		g_force_quit = true;
+	}
+}
 
 
 int
@@ -184,7 +269,7 @@ main(int argc, char **argv)
 	argc -= ret;
 	argv += ret;
 
-	force_quit = false;
+	g_force_quit = false;
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
@@ -192,6 +277,12 @@ main(int argc, char **argv)
 	ret = myapp_parse_args(argc, argv);
 	if (ret < 0)
 		rte_exit(EXIT_FAILURE, "Invalid myapp arguments\n");
+
+        // configure for the test to run. 
+        setup_test_funtions();
+
+        // run the setup functions for the particular test;
+        g_tst_func.setup(NULL);
 
 
 
