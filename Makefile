@@ -7,7 +7,7 @@ APP = myapp
 # all source are stored in SRCS-y
 SRCS-y := main.c
 SRCS-y += fs_lpm_test.c
-
+SRCS-y += fs_spinlock_test.c
 
 # Build using pkg-config variables if possible
 ifeq ($(shell pkg-config --exists libdpdk && echo 0),0)
@@ -53,7 +53,16 @@ RTE_TARGET ?= $(notdir $(abspath $(dir $(firstword $(wildcard $(RTE_SDK)/*/.conf
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
+USE_GDB="NO"
+#USE_GDB="YES"
+ifeq ($(USE_GDB),"NO")
 CFLAGS += -O3
+else  #debug info
+CFLAGS += -g     
+CFLAGS += -O
+endif
+
+
 CFLAGS += $(WERROR_FLAGS)
 # Add flag to allow experimental API as l2fwd uses rte_ethdev_set_ptype API
 CFLAGS += -DALLOW_EXPERIMENTAL_API

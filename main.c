@@ -40,38 +40,36 @@
 #include <rte_mbuf.h>
 
 #include <rte_spinlock.h>
+#include "main.h"
+
+//  TEST FUNCTION INCLUDES
 #include "fs_tstamp.h"
+#include "fs_spinlock_test.h"
 #include "fs_lpm_test.h"
 
 
 // GLOBAL DEFINITIONS REFERENCED BY TEST FUNCTIONS
 
-volatile bool g_force_quit;
-
-struct test_mode_struct {
-        int   (*setup)(void *);
-        int   (*main_loop)(void *);
-        int   (*print_results)(void *);
-        int   (*cleanup)(void *);
-};
-
-struct test_mode_struct g_tst_func;
-
-//  lock for printing to output if you need clean output
-rte_spinlock_t g_fs_print_lock = {0};
+volatile bool g_force_quit;           // Ctrl-C flag
+rte_spinlock_t g_fs_print_lock = {0}; //  lock for printing to output if 
+                                      //      you need clean output
 
 
 
 // GLOBAL DEFINITION USED IN MAIN.C
-int g_test_selection = 1;  // fix this
+struct test_mode_struct g_tst_func;   // which test algo. to run
+int32_t    g_test_selection = -1;     // which test to run
+                                      //     -1 none selected
 int myapp_parse_args(int argc, char **argv);
 
 
+
 //  DUMMY TEST FUNCTION
-int    dummy_setup( __attribute__((unused))void * arg);
-int     dummy_loop( __attribute__((unused))void * arg);
-int    dummy_print( __attribute__((unused))void * arg);
-int  dummy_cleanup( __attribute__((unused))void * arg);
+int        dummy_setup( __attribute__((unused))void * arg);
+int         dummy_loop( __attribute__((unused))void * arg);
+int        dummy_print( __attribute__((unused))void * arg);
+int      dummy_cleanup( __attribute__((unused))void * arg);
+void dummy_description( void);
 
 int dummy_setup( __attribute__((unused)) void * arg)
 {
@@ -101,21 +99,237 @@ int dummy_cleanup(__attribute__((unused)) void * arg)
      printf("dummy cleanup function %d\n",x);
      return 0;
 }
+void  dummy_description(void)
+{
+    printf(" \"Dummy\" - template test which does noting\n");
+}
 
 struct test_mode_struct  tm_dummy = {
-      .setup         = dummy_setup,
-      .main_loop     = dummy_loop,
-      .print_results = dummy_print,
-      .cleanup       = dummy_cleanup,
+      .setup          = dummy_setup,
+      .main_loop      = dummy_loop,
+      .print_results  = dummy_print,
+      .cleanup        = dummy_cleanup,
+      .description    = dummy_description,
 };
 
 
 
+void usage(void);
+void usage(void)
+{
+
+    printf("\n"); 
+    printf("  Example:\n"); 
+    printf("     myapp -c 0x0f -- -t 3\n"); 
+    printf("\n"); 
+    printf("  -c <coremash>\n");  
+    printf("  -T <option>  \n\n");
+    printf("  %d",1);   tm_spinlock.description();
+    printf("  %d",2);   tm_rwspinlock.description();
+    printf("  %d",3);   tm_rte_lcore_id.description();
+    printf("  %d",4);   tm_lpm.description();
+    printf("  %d",0);   tm_dummy.description();
+    printf("\n"); 
+}
 
 
 
+ /*
+  * Setup test function  methods.
+  */
+ static void
+ setup_test_funtions(void)
+ {
+         /* run the spinlock test. */
+         if ( g_test_selection  == 1)
+                 g_tst_func  = tm_spinlock;
+         else if ( g_test_selection  == 2)
+                 g_tst_func  = tm_rwspinlock;
+         else if ( g_test_selection  == 3)
+                 g_tst_func  = tm_rte_lcore_id;
+         else if ( g_test_selection  == 4)
+                 g_tst_func  = tm_lpm;
+
+         /* Setup dummy lookup functions. */
+         else
+                 g_tst_func = tm_dummy;
+ }
+
+
+static int
+test_launch_one_lcore(__attribute__((unused)) void *dummy)
+{
+        if (g_tst_func.main_loop != NULL) g_tst_func.main_loop(dummy);
+	return 0;
+}
+
+
+
+static void signal_handler(int signum)
+{
+	if (signum == SIGINT || signum == SIGTERM) {
+		printf("\n\nSignal %d received, preparing to exit...\n",
+				signum);
+		g_force_quit = true;
+	}
+}
+
+
+int
+main(int argc, char **argv)
+{
+	int ret;
+        unsigned  lcore_id;
+
+	/* init EAL */
+	ret = rte_eal_init(argc, argv);
+	if (ret < 0)
+		rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
+	argc -= ret;
+	argv += ret;
+
+	g_force_quit = false;
+	signal(SIGINT, signal_handler);
+	signal(SIGTERM, signal_handler);
+
+	/* parse application arguments (after the EAL ones) */
+	ret = myapp_parse_args(argc, argv);
+	if (ret < 0) {
+		rte_exit(EXIT_FAILURE, "Invalid myapp arguments\n");
+                usage();
+                return -1;
+        }
+
+        if( g_test_selection < 0)
+        {
+                printf(" No Test Function Specified.\n");
+                usage();
+       		rte_exit(EXIT_FAILURE, "Invalid myapp arguments\n");
+                return -1;
+        }
+
+        // configure for the test to run. 
+        setup_test_funtions();
+
+        // run the setup functions for the particular test;
+        if( g_tst_func.setup != NULL) g_tst_func.setup(NULL);
+
+
+	ret = 0;
+        lcore_id = rte_lcore_id();
+	/* launch per-lcore init on every lcore */
+	rte_eal_mp_remote_launch(test_launch_one_lcore, NULL, CALL_MASTER);
+	RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+		if (rte_eal_wait_lcore(lcore_id) < 0) {
+			ret = -1;
+			break;
+		}
+	}
+
+//	RTE_ETH_FOREACH_DEV(portid) {
+//		if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
+//			continue;
+//		printf("Closing port %d...", portid);
+//		rte_eth_dev_stop(portid);
+//		rte_eth_dev_close(portid);
+//		printf(" Done\n");
+//	}
+
+
+
+
+        if( g_tst_func.print_results != NULL)  g_tst_func.print_results(NULL);
+	if( g_tst_func.cleanup != NULL)  g_tst_func.cleanup(NULL);
+
+        printf("  thank you very much\n");
+	printf("Bye...\n");
+
+	return ret;
+}
+
+
+
+/***********************************************************
+ *    cmd line options
+ */
+static const char short_options[] =
+	"p:"  /* portmask */
+	"q:"  /* number of queues */
+	"t:"  /* test number */
+	;
+
+//#define CMD_LINE_OPT_MAC_UPDATING "mac-updating"
+//#define CMD_LINE_OPT_NO_MAC_UPDATING "no-mac-updating"
+
+enum {
+	/* long options mapped to a short option */
+
+	/* first long only option value must be >= 256, so that we won't
+	 * conflict with short options */
+	CMD_LINE_OPT_MIN_NUM = 256,
+};
+
+static const struct option lgopts[] = {
+//	{ CMD_LINE_OPT_MAC_UPDATING, no_argument, &mac_updating, 1},
+//	{ CMD_LINE_OPT_NO_MAC_UPDATING, no_argument, &mac_updating, 0},
+	{NULL, 0, 0, 0}
+};
+
+/* Parse the argument given in the command line of the application */
+int
+myapp_parse_args(int argc, char **argv)
+{
+	int opt, ret;
+	char **argvopt;
+	int option_index;
+	char *prgname = argv[0];
+
+	argvopt = argv;
+
+	while ((opt = getopt_long(argc, argvopt, short_options,
+				  lgopts, &option_index)) != EOF) {
+
+		switch (opt) {
+		/* portmask */
+		case 'p':
+			break;
+
+		/* nqueue */
+		case 'q':
+			break;
+
+		/* timer period */
+		case 't':
+                        printf(" -t option= %s \n",optarg);
+                        g_test_selection = atoi(optarg);
+			break;
+
+		/* long options */
+		case 0:
+			break;
+
+		default:
+			//myapp_usage(prgname);
+			return -1;
+		}
+	}
+
+	if (optind >= 0)
+		argv[optind-1] = prgname;
+
+	ret = optind-1;
+	optind = 1; /* reset getopt lib */
+	return ret;
+}
+
+
+
+
+
+
+#if 0
 // array of time stamps structures, 1 per core
-fs_time_stamp g_per_core_time_stamp[32]={0}; // per core time stamp
+// fs_time_stamp g_per_core_time_stamp[32]={0}; // per core time stamp
 
 
 struct test_mode_struct  tm_rwlock = {
@@ -220,190 +434,6 @@ int test_main_loop(__attribute__((unused)) void *dummy)
 
         return 0;
 }
-
-
- /*
-  * Setup test function  methods.
-  */
- static void
- setup_test_funtions(void)
- {
-         /* run the spinlock test. */
-         if ( g_test_selection  == 1)
-                 g_tst_func  = tm_rwlock;
-         /* Setup LPM lookup functions. */
-         else
-                 g_tst_func = tm_dummy;
- }
-
-
-static int
-test_launch_one_lcore(__attribute__((unused)) void *dummy)
-{
-	test_main_loop(dummy);
-	return 0;
-}
-
-
-
-static void signal_handler(int signum)
-{
-	if (signum == SIGINT || signum == SIGTERM) {
-		printf("\n\nSignal %d received, preparing to exit...\n",
-				signum);
-		g_force_quit = true;
-	}
-}
-
-
-int
-main(int argc, char **argv)
-{
-	int ret;
-        unsigned  lcore_id;
-
-	/* init EAL */
-	ret = rte_eal_init(argc, argv);
-	if (ret < 0)
-		rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
-	argc -= ret;
-	argv += ret;
-
-	g_force_quit = false;
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
-
-	/* parse application arguments (after the EAL ones) */
-	ret = myapp_parse_args(argc, argv);
-	if (ret < 0)
-		rte_exit(EXIT_FAILURE, "Invalid myapp arguments\n");
-
-        // configure for the test to run. 
-        setup_test_funtions();
-
-        // run the setup functions for the particular test;
-        g_tst_func.setup(NULL);
-
-
-
-	ret = 0;
-        lcore_id = rte_lcore_id();
-	/* launch per-lcore init on every lcore */
-	rte_eal_mp_remote_launch(test_launch_one_lcore, NULL, CALL_MASTER);
-	RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-		if (rte_eal_wait_lcore(lcore_id) < 0) {
-			ret = -1;
-			break;
-		}
-	}
-
-//	RTE_ETH_FOREACH_DEV(portid) {
-//		if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
-//			continue;
-//		printf("Closing port %d...", portid);
-//		rte_eth_dev_stop(portid);
-//		rte_eth_dev_close(portid);
-//		printf(" Done\n");
-//	}
-
-
-
-
-
-
-        printf("  thank you very much\n");
-        printf("  mash any key to continue\n");
-
-
-	printf("Bye...\n");
-
-	return ret;
-}
-
-
-
-/***********************************************************
- *    cmd line options
- */
-static const char short_options[] =
-	"p:"  /* portmask */
-	"q:"  /* number of queues */
-	"T:"  /* timer period */
-	;
-
-//#define CMD_LINE_OPT_MAC_UPDATING "mac-updating"
-//#define CMD_LINE_OPT_NO_MAC_UPDATING "no-mac-updating"
-
-enum {
-	/* long options mapped to a short option */
-
-	/* first long only option value must be >= 256, so that we won't
-	 * conflict with short options */
-	CMD_LINE_OPT_MIN_NUM = 256,
-};
-
-static const struct option lgopts[] = {
-//	{ CMD_LINE_OPT_MAC_UPDATING, no_argument, &mac_updating, 1},
-//	{ CMD_LINE_OPT_NO_MAC_UPDATING, no_argument, &mac_updating, 0},
-	{NULL, 0, 0, 0}
-};
-
-/* Parse the argument given in the command line of the application */
-int
-myapp_parse_args(int argc, char **argv)
-{
-	int opt, ret;
-	char **argvopt;
-	int option_index;
-	char *prgname = argv[0];
-
-	argvopt = argv;
-
-	while ((opt = getopt_long(argc, argvopt, short_options,
-				  lgopts, &option_index)) != EOF) {
-
-		switch (opt) {
-		/* portmask */
-		case 'p':
-			break;
-
-		/* nqueue */
-		case 'q':
-			break;
-
-		/* timer period */
-		case 'T':
-                        printf(" %s \n",optarg);
-//			timer_secs = l2fwd_parse_timer_period(optarg);
-//			if (timer_secs < 0) {
-//				printf("invalid timer period\n");
-//				l2fwd_usage(prgname);
-//				return -1;
-//			}
-//			timer_period = timer_secs;
-			break;
-
-		/* long options */
-		case 0:
-			break;
-
-		default:
-			//myapp_usage(prgname);
-			return -1;
-		}
-	}
-
-	if (optind >= 0)
-		argv[optind-1] = prgname;
-
-	ret = optind-1;
-	optind = 1; /* reset getopt lib */
-	return ret;
-}
-
-
-
-
-
+#endif
 
 
