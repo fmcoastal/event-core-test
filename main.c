@@ -55,8 +55,6 @@ volatile bool g_force_quit;           // Ctrl-C flag
 rte_spinlock_t g_fs_print_lock = {0}; //  lock for printing to output if 
                                       //      you need clean output
 
-
-
 // GLOBAL DEFINITION USED IN MAIN.C
 struct test_mode_struct g_tst_func;   // which test algo. to run
 int32_t    g_test_selection = -1;     // which test to run
@@ -134,7 +132,6 @@ void usage(void)
 }
 
 
-
  /*
   * Setup test function  methods.
   */
@@ -182,6 +179,12 @@ main(int argc, char **argv)
 	int ret;
         unsigned  lcore_id;
 
+        if(argc <= 1)
+        {
+            usage();
+            return 1;
+        }
+
 	/* init EAL */
 	ret = rte_eal_init(argc, argv);
 	if (ret < 0)
@@ -189,6 +192,7 @@ main(int argc, char **argv)
 	argc -= ret;
 	argv += ret;
 
+        /* init Signal functions */
 	g_force_quit = false;
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
@@ -227,17 +231,12 @@ main(int argc, char **argv)
 		}
 	}
 
-//	RTE_ETH_FOREACH_DEV(portid) {
-//		if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
-//			continue;
-//		printf("Closing port %d...", portid);
-//		rte_eth_dev_stop(portid);
-//		rte_eth_dev_close(portid);
-//		printf(" Done\n");
-//	}
-
-
-
+/*	if you change "CALL_MASTER" above to "SKIP_MASTER", the "Loop Code"
+        will not be run on this core. create a loop here where you do 
+        any processing you want.  Make sure to check g_force_quit to know when
+        to break out.  you will want to implement like the rte_eal_wait_lcore()
+        to know when all the "thread-cores" have terminated. 
+ */
 
         if( g_tst_func.print_results != NULL)  g_tst_func.print_results(NULL);
 	if( g_tst_func.cleanup != NULL)  g_tst_func.cleanup(NULL);
