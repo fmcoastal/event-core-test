@@ -2,9 +2,11 @@
 #define _main_h
 
 
+// flag to printout more data  Larger number prints more
+extern uint64_t g_verbose;
+
 // variable ctrl-c uses to terminate program
 extern volatile bool g_force_quit;
-
 
 // struct to hold test function parameters
 struct test_mode_struct {

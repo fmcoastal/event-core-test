@@ -50,7 +50,8 @@
 
 
 
-fs_time_stamp g_per_core_time_stamp[32]={0}; // per core time stamp
+fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned={0}; // per core time stamp
+uint64_t  g_per_core_result[32]={0}; // per core time stamp
 
 
 /*********************************************************************
@@ -74,9 +75,9 @@ void spinlock_description( void);
 
 int spinlock_setup( __attribute__((unused)) void * arg)
 {
-     int32_t x = -1 ;
-     if (arg != NULL ) x = *(int32_t *)arg;
-     printf("spinlock_setup function %d\n",x);
+//     int32_t x = -1 ;
+//     if (arg != NULL ) x = *(int32_t *)arg;
+//     printf("spinlock_setup function %d\n",x);
      return 0;
 }
 
@@ -129,20 +130,25 @@ int spinlock_loop( __attribute__((unused)) void * arg)
 
     }
     tstamp_end( p_per_core_time_stamp);
+    
+    // because we actually only measure 1 time,
+    // the first interval record is the time.
+    // save the interval so we can display the result for each core
+    //       at the end. 
+    g_per_core_result[lcore_id] = p_per_core_time_stamp->interval;
 
     rte_spinlock_lock( &g_fs_print_lock);
     printf(" core %d done\n",lcore_id);
     rte_spinlock_unlock( &g_fs_print_lock);
 
      // no looping while waiting for Ctrl-C funcion 
-
-    rte_spinlock_lock( &g_fs_print_lock);
-
-
-    printf("************\n    Core   %d     \n***************\n",lcore_id);
-    tstamp_print(p_per_core_time_stamp,1);
-    rte_spinlock_unlock( &g_fs_print_lock);
-
+    if (g_verbose >= 3)
+    {
+        rte_spinlock_lock( &g_fs_print_lock);
+        printf("************\n    Core   %d     \n***************\n",lcore_id);
+        tstamp_print(p_per_core_time_stamp,1);
+        rte_spinlock_unlock( &g_fs_print_lock);
+    }
     return 0;
 }
 
@@ -169,7 +175,17 @@ int spinlock_print(__attribute__((unused)) void * arg)
 
 int spinlock_cleanup(__attribute__((unused)) void * arg)
 {
-     printf("spinlock cleanup function core:%d \n",rte_lcore_id());
+     // print the results from each core
+     int i;
+     printf(" Spinlock Results\n");
+     printf(" core     interval (ticks)\n");
+     for ( i = 0 ; i < 32 ; i++)
+     {
+         if ( g_per_core_result[i] != 0 )
+         {
+              printf("  %2d       %ld\n",i, g_per_core_result[i]);
+         }
+     }
      return 0;
 }
 
@@ -213,9 +229,9 @@ int      rwspinlock_cleanup( __attribute__((unused))void * arg);
 void rwspinlock_description( void);
 int rwspinlock_setup( __attribute__((unused)) void * arg)
 {
-     int32_t x = -1 ;
-     if (arg != NULL ) x = *(int32_t *)arg;
-     printf("spinlock_setup function %d\n",x);
+//     int32_t x = -1 ;
+//     if (arg != NULL ) x = *(int32_t *)arg;
+//     printf("spinlock_setup function %d\n",x);
      return 0;
 }
 
@@ -269,19 +285,25 @@ int rwspinlock_loop( __attribute__((unused)) void * arg)
     }
     tstamp_end( p_per_core_time_stamp);
 
+    // because we actually only measure 1 time,
+    // the first interval record is the time.
+    // save the interval so we can display the result for each core
+    //       at the end. 
+    g_per_core_result[lcore_id] = p_per_core_time_stamp->interval;
+
     rte_spinlock_lock( &g_fs_print_lock);
     printf(" core %d done\n",lcore_id);
     rte_spinlock_unlock( &g_fs_print_lock);
 
      // no looping while waiting for Ctrl-C funcion 
 
-    rte_spinlock_lock( &g_fs_print_lock);
-
-
-    printf("************\n    Core   %d     \n***************\n",lcore_id);
-    tstamp_print(p_per_core_time_stamp,1);
-    rte_spinlock_unlock( &g_fs_print_lock);
-
+    if (g_verbose >= 3)
+    { 
+        rte_spinlock_lock( &g_fs_print_lock);
+        printf("************\n    Core   %d     \n***************\n",lcore_id);
+        tstamp_print(p_per_core_time_stamp,1);
+        rte_spinlock_unlock( &g_fs_print_lock);
+    }
     return 0;
 }
 
@@ -309,8 +331,19 @@ int rwspinlock_print(__attribute__((unused)) void * arg)
 
 int rwspinlock_cleanup(__attribute__((unused)) void * arg)
 {
-     printf("rw_spinlock cleanup function core:%d \n",rte_lcore_id());
-     return 0;
+     // print the results from each core
+     int i;
+     printf(" RW Spinlock Results\n");
+     printf(" core     interval (ticks)\n");
+     for ( i = 0 ; i < 32 ; i++)
+     {
+         if ( g_per_core_result[i] != 0 )
+         {
+              printf("  %2d       %ld\n",i, g_per_core_result[i]);
+         }
+     }
+
+    return 0;
 }
 
 void  rwspinlock_description(void)
@@ -339,7 +372,7 @@ struct test_mode_struct  tm_rwspinlock = {
  *********************************************************************
  *********************************************************************/
 
-#define TestFunction()     X=rte_lcore_id ();
+#define TestFunction()     x=rte_lcore_id ();
 
 //  forward reference for compiler
 int        lcore_id_setup( __attribute__((unused))void * arg);
@@ -350,9 +383,9 @@ void lcore_id_description( void);
 
 int lcore_id_setup( __attribute__((unused)) void * arg)
 {
-     int32_t x = -1 ;
-     if (arg != NULL ) x = *(int32_t *)arg;
-     printf("spinlock_setup function %d\n",x);
+//     int32_t x = -1 ;
+//     if (arg != NULL ) x = *(int32_t *)arg;
+//     printf("spinlock_setup function %d\n",x);
      return 0;
 }
 
@@ -363,6 +396,7 @@ int lcore_id_loop( __attribute__((unused)) void * arg)
     unsigned lcore_id;
     char string[256];
     int  i;
+    int  x;
 //   int32_t x = -1 ;
 //    if (arg != NULL ) x = *(int32_t *)arg;
 //    printf("dummy loop function %d\n",x);
@@ -379,46 +413,53 @@ int lcore_id_loop( __attribute__((unused)) void * arg)
     tstamp_start( p_per_core_time_stamp);
     for( i = 0 ; (i < LOCK_LOOPS) && (!g_force_quit ) ; i ++)
     {
-         RW_SpinLockFunction();                            /*1*/
-         RW_SpinLockFunction();                            /*2*/
-         RW_SpinLockFunction();                            /*3*/
-         RW_SpinLockFunction();                            /*4*/
-         RW_SpinLockFunction();                            /*5*/
+         TestFunction();                            /*1*/
+         TestFunction();                            /*2*/
+         TestFunction();                            /*3*/
+         TestFunction();                            /*4*/
+         TestFunction();                            /*5*/
 
-         RW_SpinLockFunction();                            /*1*/
-         RW_SpinLockFunction();                            /*2*/
-         RW_SpinLockFunction();                            /*3*/
-         RW_SpinLockFunction();                            /*4*/
-         RW_SpinLockFunction();                            /*5*/
+         TestFunction();                            /*1*/
+         TestFunction();                            /*2*/
+         TestFunction();                            /*3*/
+         TestFunction();                            /*4*/
+         TestFunction();                            /*5*/
 
-         RW_SpinLockFunction();                            /*1*/
-         RW_SpinLockFunction();                            /*2*/
-         RW_SpinLockFunction();                            /*3*/
-         RW_SpinLockFunction();                            /*4*/
-         RW_SpinLockFunction();                            /*5*/
+         TestFunction();                            /*1*/
+         TestFunction();                            /*2*/
+         TestFunction();                            /*3*/
+         TestFunction();                            /*4*/
+         TestFunction();                            /*5*/
 
-         RW_SpinLockFunction();                            /*1*/
-         RW_SpinLockFunction();                            /*2*/
-         RW_SpinLockFunction();                            /*3*/
-         RW_SpinLockFunction();                            /*4*/
-         RW_SpinLockFunction();                            /*5*/
+         TestFunction();                            /*1*/
+         TestFunction();                            /*2*/
+         TestFunction();                            /*3*/
+         TestFunction();                            /*4*/
+         TestFunction();                            /*5*/
 
     }
     tstamp_end( p_per_core_time_stamp);
 
+    // because we actually only measure 1 time,
+    // the first interval record is the time.
+    // save the interval so we can display the result for each core
+    //       at the end. 
+    g_per_core_result[lcore_id] = p_per_core_time_stamp->interval;
+
+
     rte_spinlock_lock( &g_fs_print_lock);
-    printf(" core %d done\n",lcore_id);
+    printf(" core %d done\n",x);
     rte_spinlock_unlock( &g_fs_print_lock);
 
      // no looping while waiting for Ctrl-C funcion 
 
-    rte_spinlock_lock( &g_fs_print_lock);
-
-
-    printf("************\n    Core   %d     \n***************\n",lcore_id);
-    tstamp_print(p_per_core_time_stamp,1);
-    rte_spinlock_unlock( &g_fs_print_lock);
-
+    if (g_verbose >= 3)
+    {  
+        rte_spinlock_lock( &g_fs_print_lock);
+        printf("************\n    Core   %d     \n***************\n",lcore_id);
+        tstamp_print(p_per_core_time_stamp,1);
+        rte_spinlock_unlock( &g_fs_print_lock);
+    }
     return 0;
 }
 
@@ -446,7 +487,18 @@ int lcore_id_print(__attribute__((unused)) void * arg)
 
 int lcore_id_cleanup(__attribute__((unused)) void * arg)
 {
-     printf("  ret_lcore_id()  cleanup function core:%d \n",rte_lcore_id());
+     // print the results from each core
+     int i;
+     printf(" rte_lcore_id Results\n");
+     printf(" core     interval (ticks)\n");
+     for ( i = 0 ; i < 32 ; i++)
+     {
+         if ( g_per_core_result[i] != 0 )
+         {
+              printf("  %2d       %ld\n",i, g_per_core_result[i]);
+         }
+     }
+
      return 0;
 }
 void  lcore_id_description(void)

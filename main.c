@@ -50,6 +50,7 @@
 
 // GLOBAL DEFINITIONS REFERENCED BY TEST FUNCTIONS
 
+uint64_t      g_verbose = 0;          // Higher number more printouts 
 volatile bool g_force_quit;           // Ctrl-C flag
 rte_spinlock_t g_fs_print_lock = {0}; //  lock for printing to output if 
                                       //      you need clean output
@@ -253,9 +254,11 @@ main(int argc, char **argv)
  *    cmd line options
  */
 static const char short_options[] =
+	"h"   /* help */
 	"p:"  /* portmask */
 	"q:"  /* number of queues */
 	"t:"  /* test number */
+	"v:"  /* verbose output */
 	;
 
 //#define CMD_LINE_OPT_MAC_UPDATING "mac-updating"
@@ -298,11 +301,23 @@ myapp_parse_args(int argc, char **argv)
 		case 'q':
 			break;
 
-		/* timer period */
+		/* help */
+		case 'h':
+                        usage();
+			break;
+
+		/* test code to run */
 		case 't':
                         printf(" -t option= %s \n",optarg);
                         g_test_selection = atoi(optarg);
 			break;
+
+		/* verbose */
+		case 'v':
+                        printf(" verbose = %s \n",optarg);
+                        g_verbose = atoi(optarg);
+			break;
+
 
 		/* long options */
 		case 0:
