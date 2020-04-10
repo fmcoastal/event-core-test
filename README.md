@@ -64,7 +64,7 @@ Download dpdk_test_app
       > git clone https://github.com/fmcoastal/dpdk_test_app.git
 
 To Build 
-  - Standalone Environment 
+  -- Standalone Environment 
   
    * cd to the dpdk_test_app directory 
    * execute make 
@@ -81,6 +81,34 @@ To Build
     * to run
       sudo ./build/test_app -c 0x0001  -- -t 1
 
-  - Buildroot Environment 
+  -- Buildroot Environment 
 
-    
+   * go to dpdk in the SDK output
+       > cd <SDK_DIR>/<xxx_release_output>/build/dpdk/examples
+
+   * get the files 
+       > git clone https://github.com/fmcoastal/dpdk_test_app.git
+
+   * Modify the dpdk envionment Makeifile
+       > vim Makefile
+ 
+      ** at the bottom of the file add "DIRS-y += dpdk_test_app".
+         should look as follows:
+
+           DIRS-y += measure_routine_time
+           DIRS-y += dpdk_test_app
+
+           include $(RTE_SDK)/mk/rte.extsubdir.mk
+
+
+   * buld the code from the <SDK_DIR>/<xxx_release_output> directory
+      
+      > cd ../../../
+      > make dpdk-rebuild
+   
+   * executible name is "test_app"
+     ** executible can  be found in:
+ 
+<SDK_DIR>/<xxx_release_output>/build/dpdk/examples/dpdk_test_app/build/test_app
+
+
