@@ -1,20 +1,11 @@
 # dpdk_test_app
 
-The dpdk_test_app is "test harness code".  THe base code (see main.c) does not set up any IO. 
-      It can be used to debug and profile code. Test code files (fs_lpm.c and fs_spinlock.c) 
-      can be copied and modified to enable the code you want to test. Adding your own test code
-      is as simple aadding your test_mode_struct "name" to the list at the top of "main.c". 
+The dpdk_test_app is "test harness code".  The base code (see main.c) does 
+      not set up any IO. It can be used to debug and profile code. Test code 
+      files (fs_lpm.c and fs_spinlock.c) can be copied and modified to 
+      enable the code you want to test. 
 
-        // array of tests
-        struct test_mode_struct test_array[] = {
-                        tm_spinlock,
-                        tm_rwspinlock,
-                        tm_rte_lcore_id,
-                        tm_lpm,
-                        YOUR_TEST_STRUCT_HERE,
-        };
-
-       Your test function must implement the following functions:
+      Your test function must implement the following functions:
           
         // struct to hold test function parameters
         struct test_mode_struct {
@@ -25,12 +16,21 @@ The dpdk_test_app is "test harness code".  THe base code (see main.c) does not s
                  void  (*description)(void);
          };
 
-        tm_dummy can be used as a template for building out your fuctionality,  Feel free to modify the 
-        main() function as you need for your testing.
+        ** tm_dummy can be used as a template for building out your 
+           fuctionality,  Feel free to modify the  main() function as 
+           you need for your testing.
+
+
+      To add your own test code, modify main.c.   Add your "test_mode_struct" the 
+         "setup_test_functions()" and "usage()" functions.  Use the next test number 
+         available.
+
 
 
 To Get Help Output:
+
          root@localhost:/home/fsmith/dpdk_test_app# ./build/test_app
+
 
   Example:
      myapp -c 0x0f -- -t 3
@@ -56,12 +56,12 @@ To Get Help Output:
 
 
 
-Download the dpdk_test_app
+Download dpdk_test_app
 
    * cd to the directory where you want the "dpdk_test_app" directory created.
    * execute the folloing command to download the Project:
 
-      > git clone https://github.com/fmcoastal/dpdk_test_app
+      > git clone https://github.com/fmcoastal/dpdk_test_app.git
 
 To Build 
   - Standalone Environment 
@@ -83,4 +83,4 @@ To Build
 
   - Buildroot Environment 
 
-
+    
