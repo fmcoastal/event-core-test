@@ -111,4 +111,5 @@ To Build
  
 <SDK_DIR>/<xxx_release_output>/build/dpdk/examples/dpdk_test_app/build/test_app
 
-
+Other Items:
+    dpdk tools like dpdk_devbind.py can be found in <DPDK_RELEASE>/usertools/dpdk-*
