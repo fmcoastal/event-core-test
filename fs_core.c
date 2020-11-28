@@ -17,6 +17,7 @@
 #include <getopt.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <unistd.h>   // for usleep
 
 #include <rte_common.h>
 #include <rte_log.h>
@@ -113,9 +114,6 @@ extern uint64_t  g_per_core_result[]; // per core time stamp
 /*********************************************************************
  *********************************************************************
  *           REGULAR SPINLOCK TEST                                   *
- *   Test: use ret_spinlock_lock() and rte_spinlock_unlock()         *
- *   execute the functions and  measure the time it takes            *
- *    to run 1000000 calls.
  *********************************************************************
  *********************************************************************/
 
@@ -415,9 +413,6 @@ uint32_t event_queue_cfg = 0;
 
 //135     evt_rsrc->def_p_conf = event_p_conf;
 
-
-
-
        }
 
 //////
@@ -466,98 +461,148 @@ uint32_t event_queue_cfg = 0;
 //////
 //////  So we have n cores.   For this app, I want 1 core to have 1 port and 1 queue.
 /////                         we will use the Index to be the Index of the core??
-
- 
      {
-        uint32_t  evdev_service_id = 0;
         int32_t ret;
  
-        ret = rte_event_dev_start( g_evt_dev_id )
+        ret = rte_event_dev_start( g_evt_dev_id );
         if (  ret  < 0)
+        {
                 printf(" Event Dev Device Start failed:  %d \n",ret);
                 rte_exit(EXIT_FAILURE, "Error starting eventdev");
+        }
         else
-            
+        {    
             printf(" Event Dev Device Started successfully \n");
-
+        }
      }
-
-
-
-
-
-
-
      return 0;
 }
 
+void print_struct_rte_event( const char * string,struct rte_event *p);
+void print_struct_rte_event( const char * string,struct rte_event *p)
+{
+        printf("  %s        add:%p  \n"   , string  ,p        );
+        printf("     flow_id        %d \n", p->flow_id        );
+        printf("     sub_event_type %d \n", p->sub_event_type );
+        printf("     event_type     %d \n", p->event_type     );
+        printf("     op             %d \n", p->op             );
+        printf("     sched_type     %d \n", p->sched_type     );
+        printf("     queue_id       %d \n", p->queue_id       );
+        printf("     priority       %d \n", p->priority       );
+        printf("     event_ptr      %p \n", p->event_ptr       );
+}
+
+
 #define LOCK_LOOPS (10*10)
+#define BATCH_SIZE  4
+
+char  m0[] = { "Eat"        };
+char  m1[] = { "At"         };
+char  m2[] = { "Joes"       };
+char  m3[] = { "Bar & Grill"};
+char * message[] = {m0,m1,m2,m3};
+
 
 int core_loop( __attribute__((unused)) void * arg)
 {
     unsigned lcore_id;
-    char string[256];
-    int  i;
-//   int32_t x = -1 ;
-//    if (arg != NULL ) x = *(int32_t *)arg;
-//    printf("dummy loop function %d\n",x);
+//    char string[256];
+//    int  i;
+    struct rte_event   ev;
 
-    fs_time_stamp *p_per_core_time_stamp;
+    uint8_t dev_id ;
+    uint8_t port_id ;
+//    size_t sent = 0, received = 0;
+   
+    struct rte_event events[BATCH_SIZE];
+    uint16_t nb_rx; 
+    uint8_t  next_core[] = {1,2,3,0};  
+    uint16_t ret;
 
     lcore_id = rte_lcore_id();
+    dev_id = g_evt_dev_id;
+    port_id = lcore_id; 
+
+    if( lcore_id == 0 )
+    {
+
+        printf("*** Put an event into the Event Dev Scheduler ***\n");
+
+        printf("        dev_id: %d  \n ",dev_id);
+        printf("        port_id: %d \n ",port_id);
+        printf("        lcore_id: %d \n ",lcore_id);
+      
+        ev.event=0;    // set "event union" to 0
+        ev.event_ptr  = (void *) (message[lcore_id]) ;  // set the second 64 bits to point at a payload
+
+// In order to get sso to deliver, I had to add the following to the WQE
+        ev.flow_id        = 0xDEAD;                 // uint32_t flow_id:20;
+        ev.sub_event_type = RTE_EVENT_TYPE_CPU ;    // uint32_t sub_event_type:8;
+        ev.event_type     = RTE_EVENT_TYPE_CPU ;    // uint32_t event_type:4;
+        ev.op             = RTE_EVENT_OP_NEW;         // uint8_t op:2; NEW,FORWARD or RELEASE
+        //ev.rsvd           =  ;                      // uint8_t rsvd:4;
+        ev.sched_type     = RTE_SCHED_TYPE_PARALLEL ;       // uint8_t  sched_type:2;
+        ev.queue_id       = 1 ;                             // uint8_t  queue_id;
+        ev.priority       = RTE_EVENT_DEV_PRIORITY_NORMAL ; // uint8_t  priority;
+        //ev.impl_opaque    =  ; // uint8_t  impl_opaque;
+
+        print_struct_rte_event( "ev",&ev);
+
+        ret = rte_event_enqueue_burst(dev_id, lcore_id,&ev, 1 );
+        if( ret != 1 )
+        {
+             printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
+             printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
+             rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
+        }
+
+   }
+
+
+// struct worker_data *data = (struct worker_data *)arg;
+
     printf(" Launch code on Core: %d\n",lcore_id);
-
-    p_per_core_time_stamp = &(g_per_core_time_stamp[lcore_id]);
-    sprintf(string,"per_core_time_stamp[%d]",lcore_id);
-    tstamp_init( p_per_core_time_stamp, string);
-
-    tstamp_start( p_per_core_time_stamp);
-    for( i = 0 ; (i < LOCK_LOOPS) && (!g_force_quit ) ; i ++)
+    while (!g_force_quit)
     {
-         SpinLockFunction();                            /*1*/
-         SpinLockFunction();                            /*2*/
-         SpinLockFunction();                            /*3*/
-         SpinLockFunction();                            /*4*/
-         SpinLockFunction();                            /*5*/
+       // lots of handwaving here.  there should be only one event 
+       //    put in before the Event loop
+ 
+        nb_rx = rte_event_dequeue_burst(dev_id, port_id,
+                                events, RTE_DIM(events), 0);
 
-         SpinLockFunction();                            /*1*/
-         SpinLockFunction();                            /*2*/
-         SpinLockFunction();                            /*3*/
-         SpinLockFunction();                            /*4*/
-         SpinLockFunction();                            /*5*/
+        if (nb_rx == 0) 
+        {
+            rte_pause();
+            continue;
+        }
+        printf("****    c%d) Received %d events **** \n",lcore_id,nb_rx);
+        print_struct_rte_event( "event[0]",&events[0]);
+        printf(" Message:   %s\n",(char *)events[0].event_ptr);
 
-         SpinLockFunction();                            /*1*/
-         SpinLockFunction();                            /*2*/
-         SpinLockFunction();                            /*3*/
-         SpinLockFunction();                            /*4*/
-         SpinLockFunction();                            /*5*/
+        printf("  c%d) Send message to next Port (aka core for me)  %d events\n",lcore_id,next_core[lcore_id]);
 
-         SpinLockFunction();                            /*1*/
-         SpinLockFunction();                            /*2*/
-         SpinLockFunction();                            /*3*/
-         SpinLockFunction();                            /*4*/
-         SpinLockFunction();                            /*5*/
+        // set to forward to next core.
+        events[0].queue_id       = next_core[lcore_id];
+        // set operation to forward packet    
+        //  events[0].op             = RTE_EVENT_OP_FORWARD;
+        events[0].flow_id        += 1;
+        events[0].event_ptr  = (void *)message[lcore_id]; 
 
-    }
-    tstamp_end( p_per_core_time_stamp);
-    
-    // because we actually only measure 1 time,
-    // the first interval record is the time.
-    // save the interval so we can display the result for each core
-    //       at the end. 
-    g_per_core_result[lcore_id] = p_per_core_time_stamp->interval;
+ 
+        rte_pause();
+        usleep(1000000);     
+ 
+        ret = rte_event_enqueue_burst(dev_id, port_id,
+                                events, nb_rx);
+        if( ret != 1 )
+        {
+             printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
+             printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
+             rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
+        }
 
-    rte_spinlock_lock( &g_fs_print_lock);
-    printf(" core %d done\n",lcore_id);
-    rte_spinlock_unlock( &g_fs_print_lock);
+//        if (lcore_id == 3) g_force_quit = true;
 
-     // no looping while waiting for Ctrl-C funcion 
-    if (g_verbose >= 3)
-    {
-        rte_spinlock_lock( &g_fs_print_lock);
-        printf("************\n    Core   %d     \n***************\n",lcore_id);
-        tstamp_print(p_per_core_time_stamp,1);
-        rte_spinlock_unlock( &g_fs_print_lock);
     }
     return 0;
 }
@@ -568,16 +613,12 @@ int core_print(__attribute__((unused)) void * arg)
 //    if (arg != NULL ) x = *(int32_t *)arg;
 //    printf("dummy print function %d\n",x);
 
-    unsigned lcore_id;
-    fs_time_stamp *p_per_core_time_stamp;
-
-    lcore_id = rte_lcore_id();
+//    unsigned lcore_id;
+//    lcore_id = rte_lcore_id();
     rte_spinlock_lock( &g_fs_print_lock);
 
-    p_per_core_time_stamp = &(g_per_core_time_stamp[lcore_id]);
- 
-    printf("************\n    Core   %d     \n***************\n",lcore_id);
-    tstamp_print(p_per_core_time_stamp,1);
+    // put your print statements here.
+
     rte_spinlock_unlock( &g_fs_print_lock);
 
      return 0;
@@ -586,18 +627,6 @@ int core_print(__attribute__((unused)) void * arg)
 int core_cleanup(__attribute__((unused)) void * arg)
 {
      // print the results from each core
-     int i;
-     printf(" Spinlock Results\n");
-     printf(" core     interval (ticks)\n");
-     for ( i = 0 ; i < 32 ; i++)
-     {
-         if ( g_per_core_result[i] != 0 )
-         {
-              printf("  %2d       %ld\n",i, g_per_core_result[i]);
-         }
-     }
-
-
 
      rte_event_dev_dump( g_evt_dev_id  ,stdout);
 
