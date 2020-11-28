@@ -46,6 +46,7 @@
 #include "fs_tstamp.h"
 #include "fs_spinlock_test.h"
 #include "fs_lpm_test.h"
+#include "fs_core.h"
 
 
 // GLOBAL DEFINITIONS REFERENCED BY TEST FUNCTIONS
@@ -127,6 +128,7 @@ void usage(void)
     printf("  %d",2);   tm_rwspinlock.description();
     printf("  %d",3);   tm_rte_lcore_id.description();
     printf("  %d",4);   tm_lpm.description();
+    printf("  %d",5);   tm_core.description();
     printf("  %d",0);   tm_dummy.description();
     printf("\n"); 
 }
@@ -147,6 +149,9 @@ void usage(void)
                  g_tst_func  = tm_rte_lcore_id;
          else if ( g_test_selection  == 4)
                  g_tst_func  = tm_lpm;
+         else if ( g_test_selection  == 5)
+                 g_tst_func  = tm_core;
+
 
          /* Setup dummy lookup functions. */
          else
@@ -216,6 +221,7 @@ main(int argc, char **argv)
         // configure for the test to run. 
         setup_test_funtions();
 
+#include "fs_log.h"
         // run the setup functions for the particular test;
         if( g_tst_func.setup != NULL) g_tst_func.setup(NULL);
 
