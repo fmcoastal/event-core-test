@@ -1,0 +1,70 @@
+#!/bin/bash
+
+
+RED=$'\e[31m'
+GREEN=$'\e[32m'
+WHITE=$'\e[37m'
+
+
+echo "******************"
+echo "* Before  "
+echo "******************"
+cat /proc/meminfo |grep -i Huge 
+
+
+#MOUNT_DIR=/mnt/huge
+MOUNT_DIR=/huge
+
+
+echo ""
+echo "******************"
+echo "* Test if $MOUNT_DIR exits.  Create if not present"
+echo "******************"
+
+
+if [ ! -d $MOUNT_DIR ] ; then
+    echo "$RED Creating $MOUNT_DIR $WHITE"
+    mkdir -p $MOUNT_DIR
+else
+    echo " file $MOUNT_DIR exists" 
+fi
+
+
+echo ""
+echo "******************"
+echo "* test if hugetlbs has been mounted to $MOUNT_DIR"
+echo "******************"
+TST_MOUNT=$(mount |grep -i $MOUNT_DIR)
+echo   "--- TST_MOUNT:   $TST_MOUNT"
+if [ "$TST_MOUNT"  == "" ] ; then
+    echo "$RED** creating mount for hugetlbs ***$WHITE"
+    mount -t hugetlbfs nodev $MOUNT_DIR
+else
+  echo  "-- nodev has been mounted to $MOUNT_DIR --"
+fi
+
+#------------------------------------------------------
+
+echo ""
+echo "******************"
+echo "* Test if pages in the pool.  add if none present"
+echo "******************"
+ALLOCATE=$( cat /proc/meminfo | grep -i "HugePages_Total" )
+echo "--- ALLOCATE:  $ALLOCATE"
+
+# echo fish out the value
+HUGEPAGES_TOTAL=$( echo $ALLOCATE | awk '{print $2}' )
+echo "--- HUGEPAGES_TOTAL:   $HUGEPAGES_TOTAL"
+
+if [ $HUGEPAGES_TOTAL == 0 ] ;  then 
+   echo "$RED adding pages to the pool $WHITE"
+   echo 16 >/proc/sys/vm/nr_hugepages
+else
+	echo "pool already has pages added "
+fi   
+
+echo "******************"
+echo "* After"
+echo "******************"
+cat /proc/meminfo |grep -i Huge 
+

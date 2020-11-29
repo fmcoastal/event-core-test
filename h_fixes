@@ -1,0 +1,32 @@
+#!/bin/bash -x
+
+echo "177d a0f9" >  /sys/bus/pci/drivers/vfio-pci/new_id
+
+dpdk-devbind -s | grep a0f9
+
+
+echo 0 > /sys/bus/pci/devices/0002:07:00.0/limits/sso
+echo 0 > /sys/bus/pci/devices/0002:08:00.0/limits/sso
+echo 0 > /sys/bus/pci/devices/0002:09:00.0/limits/sso
+echo 0 > /sys/bus/pci/devices/0002:0a:00.0/limits/sso
+echo 0 > /sys/bus/pci/devices/0002:0b:00.0/limits/sso
+echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
+
+echo 0 > /sys/bus/pci/devices/0002:07:00.0/limits/ssow
+echo 0 > /sys/bus/pci/devices/0002:08:00.0/limits/ssow
+echo 0 > /sys/bus/pci/devices/0002:09:00.0/limits/ssow
+echo 0 > /sys/bus/pci/devices/0002:0a:00.0/limits/ssow
+echo 0 > /sys/bus/pci/devices/0002:0b:00.0/limits/ssow
+echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+
+
+
+echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/tim
+echo 1 > /sys/bus/pci/devices/0002:0e:00.0/limits/npa
+echo 16 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
+# set limit 26 for 8 or less core
+echo 26 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+# set limit 32 for 8 or more core
+#echo 32 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+#echo 46 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+

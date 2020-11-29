@@ -21,7 +21,8 @@ struct test_mode_struct {
  //  lock for printing to output if you need clean output
 extern rte_spinlock_t g_fs_print_lock ;
 
-
+extern char C_GREEN[];
+extern char C_NORMAL[];
 
 
 #endif

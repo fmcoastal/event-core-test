@@ -120,8 +120,8 @@ EINVAL:  22 0x16
 
 static inline char * format_ip_addr(char * str,uint32_t ip);
 
-static const char C_NORMAL[]   ={0x1b,'[','0','m',0x00};         /* NORMAL=$'\e[0m'    */
-static const char C_GREEN[]    ={0x1b,'[','3','2','m',0x00};     /* GREEN =$'\e[32m' */
+//static const char C_NORMAL[]   ={0x1b,'[','0','m',0x00};         /* NORMAL=$'\e[0m'    */
+//static const char C_GREEN[]    ={0x1b,'[','3','2','m',0x00};     /* GREEN =$'\e[32m' */
 
 static inline void NORMAL(void) { printf("%s",C_NORMAL);}
 static inline void GREEN(void)  { printf("%s",C_GREEN);}
