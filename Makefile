@@ -2,12 +2,14 @@
 # Copyright(c) 2010-2014 Intel Corporation
 
 # binary name
-APP = test_app
+APP = core_test_app
 
 # all source are stored in SRCS-y
 SRCS-y := main.c
 SRCS-y += fs_lpm_test.c
 SRCS-y += fs_spinlock_test.c
+SRCS-y += fs_core.c
+SRCS-y += fs_crypto.c
 
 # Build using pkg-config variables if possible
 ifeq ($(shell pkg-config --exists libdpdk && echo 0),0)

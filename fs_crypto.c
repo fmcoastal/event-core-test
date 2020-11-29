@@ -103,13 +103,8 @@ o-------------> | |    flow 1   | |      |
 //       maybe later, i will increase the number of queues and try to inject a timer event.
 
 
-const char * StringSched[] = {"RTE_SCHED_TYPE_ORDERED",
-                              "RTE_SCHED_TYPE_ATOMIC",
-                              "RTE_SCHED_TYPE_PARALLEL"};
-
-
-extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core time stamp
-extern uint64_t  g_per_core_result[]; // per core time stamp
+// extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core time stamp
+// extern uint64_t  g_per_core_result[]; // per core time stamp
 
 
 /*********************************************************************
@@ -118,25 +113,32 @@ extern uint64_t  g_per_core_result[]; // per core time stamp
  *********************************************************************
  *********************************************************************/
 
-extern rte_spinlock_t g_spinlock_measure_lock;
+// extern rte_spinlock_t g_spinlock_measure_lock;
 #define SpinLockFunction()  rte_spinlock_lock( &g_spinlock_measure_lock); rte_spinlock_unlock( &g_spinlock_measure_lock);
 
 //  forward reference for compiler
-int        core_setup( __attribute__((unused))void * arg);
-int         core_loop( __attribute__((unused))void * arg);
-int        core_print( __attribute__((unused))void * arg);
-int      core_cleanup( __attribute__((unused))void * arg);
-void core_description( void);
+int        crypto_setup( __attribute__((unused))void * arg);
+int         crypto_loop( __attribute__((unused))void * arg);
+int        crypto_print( __attribute__((unused))void * arg);
+int      crypto_cleanup( __attribute__((unused))void * arg);
+void crypto_description( void);
 
 
-uint8_t g_evt_dev_id;
-uint8_t g_nb_PortsPerCore ; 
-uint8_t g_nb_QueuesPerCore ; 
+// FIGURE OUT THE four VARIABLE BELOW LATER
+extern const char * StringSched[];
+extern uint8_t g_evt_dev_id;    // this variable should be moved out of the fs_core file to a global evnet_dev_id for 
+                                // all eveent devices using the same SSO instance....
+extern uint8_t g_nb_PortsPerCore ; 
+extern uint8_t g_nb_QueuesPerCore ; 
 
 
-int core_setup( __attribute__((unused)) void * arg)
+
+
+
+int crypto_setup( __attribute__((unused)) void * arg)
 {
 int     result;
+uint8_t      i;
 unsigned int nb_lcores = rte_lcore_count();
 
 uint8_t                       nb_event_dev_devices = 0;
@@ -174,8 +176,15 @@ uint32_t event_queue_cfg = 0;
             printf(" did you forget to bind at least 1 to vfio-pci\n");
             rte_exit(EXIT_FAILURE, "No Event Devices available");   
         }
-         printf(" found %d event devices \n", nb_event_dev_devices);
-    
+        printf(" found %d event devices \n", nb_event_dev_devices);
+
+//        int rte_event_dev_info_get (uint8_t dev_id, struct rte_event_dev_info *dev_info)
+        for (i = 0 ; i < nb_event_dev_devices ; i++)
+        {   
+           result = rte_event_dev_info_get(i,&dev_info);
+           printf("  %d)  %s\n",i, dev_info.driver_name); 
+        }
+   
         if( nb_event_dev_devices != 1)
         {
             printf(" ** WARNING:: Number of  event dev devices found is not what is expected \n"); 
@@ -198,6 +207,7 @@ uint32_t event_queue_cfg = 0;
 //////////  rte_event_dev_configure()
 //////////
 //////////   Get default event_dev Setting and  Capabilities
+        printf(" %s call rte_event_dev_info_get() %s\n",C_GREEN,C_NORMAL);
         result = rte_event_dev_info_get( g_evt_dev_id, &dev_info );
         printf(" result    %d \n",result);
         printf(" default: dev_info \n");
@@ -246,12 +256,12 @@ uint32_t event_queue_cfg = 0;
         printf("          uint32_t nb_event_port_dequeue_depth  x 0x%08x \n", event_dev_config.nb_event_port_dequeue_depth  );   	
         printf("          uint32_t nb_event_port_enqueue_depth  x 0x%08x \n", event_dev_config.nb_event_port_enqueue_depth  );   	
         printf("          uint32_t event_dev_cfg                  0x%08x \n", event_dev_config.event_dev_cfg                );   	
-    
-    
+
+        printf(" %scall rte_event_dev_configure() %s\n",C_GREEN,C_NORMAL);
         result = rte_event_dev_configure(g_evt_dev_id, &event_dev_config);
         if(result < 0)
         {
-             printf(" rte_event_dev_configure returned %d\n",result);
+             printf(" rte_event_dev_configure() returned %d\n",result);
              rte_panic("Error in configuring event device\n");
         }
     }
@@ -263,7 +273,7 @@ uint32_t event_queue_cfg = 0;
 //////   Get default event_queue Setting and  Capabilities
         int ret;
 
-           
+            printf(" %scall rte_event_queue_default_conf_get() %s\n",C_GREEN,C_NORMAL);
             rte_event_queue_default_conf_get(g_evt_dev_id, event_q_id, &def_q_conf);
             
             printf(" default: event dev -> queue info event_q_id=%d \n",event_q_id);
@@ -326,6 +336,7 @@ uint32_t event_queue_cfg = 0;
            {
              // above I set teh number of queues and the number of ports = number of cores:
              //    So I should loop through each evnet_q_ID.
+                 printf(" %scall rte_event_queue_setup() for event_q_id %d %s\n",C_GREEN,event_q_id, C_NORMAL);
                  ret = rte_event_queue_setup(g_evt_dev_id , event_q_id,
                                 &event_q_conf);
                 if (ret < 0)
@@ -351,6 +362,7 @@ uint32_t event_queue_cfg = 0;
                 rte_panic("Failed to allocate memory for Event Ports\n");
            */
        
+            printf(" %scall rte_event_port_default_conf_get() %s\n",C_GREEN,C_NORMAL);
             rte_event_port_default_conf_get(g_evt_dev_id, 0, &def_p_conf);
 
             printf(" default: event port config  -> def_p_conf \n");
@@ -364,8 +376,6 @@ uint32_t event_queue_cfg = 0;
             event_p_conf.dequeue_depth = 32,
             event_p_conf.enqueue_depth = 32,
             event_p_conf.new_event_threshold = 4096;
- 
-
 
 
      if (def_p_conf.new_event_threshold < event_p_conf.new_event_threshold)
@@ -395,6 +405,7 @@ uint32_t event_queue_cfg = 0;
 
 
      for (event_p_id = 0; event_p_id < (g_nb_PortsPerCore * nb_lcores) ; event_p_id++) {
+         printf(" %scall rte_event_port_setup() for event_p_id %d %s\n",C_GREEN,event_p_id,C_NORMAL);
          ret = rte_event_port_setup(g_evt_dev_id, event_p_id,  &event_p_conf);
          if (ret < 0)
              rte_panic("Error in configuring event port %d\n",
@@ -434,19 +445,21 @@ uint32_t event_queue_cfg = 0;
            priorities_array[0] = RTE_EVENT_DEV_PRIORITY_NORMAL ;
 
            printf(" Linking Port %d to queue %d \n",event_p_id,event_p_id);
+
+           printf(" %scall rte_event_port_link() for event_p_id %d %s\n",C_GREEN,event_p_id,C_NORMAL);
            ret = rte_event_port_link ( g_evt_dev_id , event_p_id, queues_array, priorities_array, nb_links);
            if (ret != nb_links )
            {
               rte_panic("Error in rte_event_port_link() requested %d successfull %d\n",nb_links,ret);
            }
         }
-
     }
 
     {
         uint32_t  evdev_service_id = 0;
         int32_t ret;
         //  THis might be for SW version of event dev MGR???  But sure what this is and how it is used.
+        printf(" %scall  rte_event_dev_service_id_get()  %s\n",C_GREEN,C_NORMAL);
         ret = rte_event_dev_service_id_get(g_evt_dev_id,
                                 &evdev_service_id);
         if (ret != -ESRCH && ret != 0) {
@@ -465,6 +478,7 @@ uint32_t event_queue_cfg = 0;
      {
         int32_t ret;
  
+        printf(" %scall rte_event_dev_start() %s\n",C_GREEN,C_NORMAL);
         ret = rte_event_dev_start( g_evt_dev_id );
         if (  ret  < 0)
         {
@@ -479,7 +493,9 @@ uint32_t event_queue_cfg = 0;
      return 0;
 }
 
+
 void print_struct_rte_event( const char * string,struct rte_event *p);
+#if 0
 void print_struct_rte_event( const char * string,struct rte_event *p)
 {
         printf("  %s        add:%p  \n"   , string  ,p        );
@@ -492,19 +508,19 @@ void print_struct_rte_event( const char * string,struct rte_event *p)
         printf("     priority       %d \n", p->priority       );
         printf("     event_ptr      %p \n", p->event_ptr       );
 }
-
+#endif
 
 #define LOCK_LOOPS (10*10)
 #define BATCH_SIZE  4
 
-char  m0[] = { "Eat"        };
-char  m1[] = { "At"         };
-char  m2[] = { "Joes"       };
-char  m3[] = { "Bar & Grill"};
-char * message[] = {m0,m1,m2,m3};
+//char  m0[] = { "Eat"        };
+//char  m1[] = { "At"         };
+//char  m2[] = { "Joes"       };
+//char  m3[] = { "Bar & Grill"};
+extern char * message[];
 
 
-int core_loop( __attribute__((unused)) void * arg)
+int crypto_loop( __attribute__((unused)) void * arg)
 {
     unsigned lcore_id;
 //    char string[256];
@@ -608,7 +624,7 @@ int core_loop( __attribute__((unused)) void * arg)
     return 0;
 }
 
-int core_print(__attribute__((unused)) void * arg)
+int crypto_print(__attribute__((unused)) void * arg)
 {
 //    int32_t x = -1 ;
 //    if (arg != NULL ) x = *(int32_t *)arg;
@@ -625,7 +641,7 @@ int core_print(__attribute__((unused)) void * arg)
      return 0;
 }
 
-int core_cleanup(__attribute__((unused)) void * arg)
+int crypto_cleanup(__attribute__((unused)) void * arg)
 {
      // print the results from each core
 
@@ -650,20 +666,21 @@ Close an event device. The device cannot be restarted! */
      return 0;
 }
 
-void  core_description(void)
+void  crypto_description(void)
 {
-    printf(" \"core\" - try to set up event device to pass events \n");
-    printf("                from core to core\n");
+    printf(" \"crypto\" - send a packt to the crypto engine to encrypt \n");
+    printf("                then send the result to decrypt\n");
+    printf("                loop\n");
 }
 
 
 
-struct test_mode_struct  tm_core = {
-      .setup         = core_setup,
-      .main_loop     = core_loop,
-      .print_results = core_print,
-      .cleanup       = core_cleanup,
-      .description   = core_description,
+struct test_mode_struct  tm_crypto = {
+      .setup         = crypto_setup,
+      .main_loop     = crypto_loop,
+      .print_results = crypto_print,
+      .cleanup       = crypto_cleanup,
+      .description   = crypto_description,
 };
 
 

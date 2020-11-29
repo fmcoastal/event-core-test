@@ -47,6 +47,7 @@
 #include "fs_spinlock_test.h"
 #include "fs_lpm_test.h"
 #include "fs_core.h"
+#include "fs_crypto.h"
 
 
 // GLOBAL DEFINITIONS REFERENCED BY TEST FUNCTIONS
@@ -55,6 +56,12 @@ uint64_t      g_verbose = 0;          // Higher number more printouts
 volatile bool g_force_quit;           // Ctrl-C flag
 rte_spinlock_t g_fs_print_lock = {0}; //  lock for printing to output if 
                                       //      you need clean output
+
+char C_GREEN[]   ={0x1b,'[','3','2','m',0x00};     // GREEN=$'\e[32m'
+char C_NORMAL[]  ={0x1b,'[','0','m',0x00};         /* NORMAL=$'\e[0m'    */
+
+
+
 
 // GLOBAL DEFINITION USED IN MAIN.C
 struct test_mode_struct g_tst_func;   // which test algo. to run
@@ -129,6 +136,7 @@ void usage(void)
     printf("  %d",3);   tm_rte_lcore_id.description();
     printf("  %d",4);   tm_lpm.description();
     printf("  %d",5);   tm_core.description();
+    printf("  %d",6);   tm_crypto.description();
     printf("  %d",0);   tm_dummy.description();
     printf("\n"); 
 }
@@ -151,6 +159,9 @@ void usage(void)
                  g_tst_func  = tm_lpm;
          else if ( g_test_selection  == 5)
                  g_tst_func  = tm_core;
+         else if ( g_test_selection  == 6)
+                 g_tst_func  = tm_crypto;
+
 
 
          /* Setup dummy lookup functions. */
