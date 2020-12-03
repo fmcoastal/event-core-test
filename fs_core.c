@@ -176,19 +176,20 @@ uint32_t event_queue_cfg = 0;
         }
         printf(" found %d event devices \n", nb_event_dev_devices);
  
+//  debug -print out all event dev devices
 //        int rte_event_dev_info_get (uint8_t dev_id, struct rte_event_dev_info *dev_info)
         for (i = 0 ; i < nb_event_dev_devices ; i++)
         {
            result = rte_event_dev_info_get(i,&dev_info);
            printf("  %d)  %s\n",i, dev_info.driver_name);
         }
-    
+//  My test- I expect just 1    
         if( nb_event_dev_devices != 1)
         {
             printf(" ** WARNING:: Number of  event dev devices found is not what is expected \n"); 
         }
         // WHY at least there is at least 1  device,  Index=0;
-        g_evt_dev_id = 0; 
+        g_evt_dev_id = 0;     // assign dev_id  to 0
 
 
         g_nb_PortsPerCore = 1   ; 
@@ -225,11 +226,10 @@ uint32_t event_queue_cfg = 0;
         printf("          int32_t      max_num_events                   0x%08x \n",dev_info.max_num_events                 );  //int32_t 	
         printf("          uint32_t     event_dev_cap                    0x%08x \n",dev_info.event_dev_cap                  );  //uint32_t 	
     
-   // check compatability
+   // check compatability - make sure queue will accept any type of RTE_SCHED_TYPE_* values: 
+   //                                 ordered,parallel,atomic,ethdev,ccryptodev,timer,...
         if (dev_info.event_dev_cap & RTE_EVENT_DEV_CAP_QUEUE_ALL_TYPES)
              event_queue_cfg |= RTE_EVENT_QUEUE_CFG_ALL_TYPES;
-
-
 
      //////  rte_event_dev_configure()
     
@@ -283,15 +283,11 @@ uint32_t event_queue_cfg = 0;
                                                                  ,StringSched[def_q_conf.schedule_type]             );  //  	
             printf("          uint8_t  priority                     0x%02x \n", def_q_conf.priority                  );  //  	
             
-
-
             event_q_conf.nb_atomic_flows           = 1024;
             event_q_conf.nb_atomic_order_sequences = 1024;
             event_q_conf.event_queue_cfg           = event_queue_cfg;
        //     event_q_conf.schedule_type             = RTE_EVENT_QUEUE_CFG_ALL_TYPES ;
             event_q_conf.priority                  = RTE_EVENT_DEV_PRIORITY_NORMAL ;
-
-
             
             if (def_q_conf.nb_atomic_flows < event_q_conf.nb_atomic_flows)
                 event_q_conf.nb_atomic_flows = def_q_conf.nb_atomic_flows;
@@ -391,16 +387,15 @@ uint32_t event_queue_cfg = 0;
 114         evt_rsrc->disable_implicit_release;
 115
 */
-       event_p_conf.disable_implicit_release = 0 ; // WHAT IS THIS ????
-
-
+       event_p_conf.disable_implicit_release = 0 ; // marvell extension  see:
+                                                   //  "<dpdk>/lib/librte_eventdev/rte_eventdev.h
+                                                     
             printf(" Config: event port config  -> event_p_conf \n");
             printf("      struct rte_event_port_conf *\n") ; 
             printf("          int32_t  new_event_threshold        0x%08x \n", event_p_conf.new_event_threshold      );    	
             printf("          uint16_t dequeue_depth              0x%04x \n", event_p_conf.dequeue_depth            );    	
             printf("          uint16_t enqueue_depth              0x%04x \n", event_p_conf.enqueue_depth            );    	
             printf("          uint8_t  disable_implicit_release   0x%02x \n", event_p_conf.disable_implicit_release );  
-
 
      for (event_p_id = 0; event_p_id < (g_nb_PortsPerCore * nb_lcores) ; event_p_id++) {
          printf(" %scall rte_event_port_setup() for event_p_id %d %s\n",C_GREEN,event_p_id,C_NORMAL);
