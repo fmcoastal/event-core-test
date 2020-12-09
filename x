@@ -2,15 +2,17 @@
 
 
 RUN_CODE=0
-if [ "$1" != "" ] ; then
- echo " test 0:  ??  "
- echo " test 1:  Spin Lock test "
- echo " test 2:  ???  "
- echo " test 3:  ???  "
- echo " test 4:  Longest prefix match test code "
- echo " test 5:  event dev, moce message to next core   "
- echo " test 6:  crypto  "
- exit
+if [ "$1" == "" ] ; then
+   echo " test 0:  ??  "
+   echo " test 1:  Spin Lock test "
+   echo " test 2:  ???  "
+   echo " test 3:  ???  "
+   echo " test 4:  Longest prefix match test code "
+   echo " test 5:  event dev, moce message to next core   "
+   echo " test 6:  crypto  "
+   exit
+else
+   RUN_CODE=$1
 fi
 
 if [ "$RUN_CODE" == "0" ] ; then

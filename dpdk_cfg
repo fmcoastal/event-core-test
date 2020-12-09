@@ -1,4 +1,4 @@
-#!/bin/bash                   
+#!/bin/bash  
 
 GREEN=$'\e[32m'
 WHITE=$'\e[37m'
@@ -21,25 +21,122 @@ echo "dpdk-devbind.py --bind=vfio-pci  $1"
 dpdk-devbind.py --bind=vfio-pci  $1
 }
 
+
+
+#if [ 0 ] ; then 
+#set -x
+###############################
+##  check if there is a vf crypto device
+##    if not, create one
+###################################
+## a0fd is the pci device id of the crypto PF device in a OTX2 
+#CDEV_PCI=$(lspci -d:a0fd | awk '{print $1;}')
+##echo $CDEV_PCI
+#
+## general sed for swapping chars   sed '/s/old_char/new_char/g' <<<"INPUT"
+##                                  all the '\' are delimiters for special chars
+#PSTRING=$( echo $CDEV_PCI | sed  's/\:/\\\:/g' )
+##echo $PSTRING
+##NUM_VF=$(cat /sys/bus/pci/drivers/octeontx2-cpt/0002\:10\:0.0/sriov_numvfs)
+#
+## echo 1 > /sys/bus/pci/drivers/octeontx2-cpt/0002\:10\:00.0/sriov_numvfs
+#
+#CDEV=$(dpdk-devbind.py -s | grep "$CDEV_PCI".1)
+##echo $CDEV
+#fi
+
+#####################################################
+#   from h_fixes
+#####################################################
+# clear SSO
+echo "177d a0f9" >  /sys/bus/pci/drivers/vfio-pci/new_id
+SSO_PF=$(lspci -d:a0f9  | cut -d ' ' -f 1)
+
+for i in $SSO_PF  ; do
+  echo " echo 0 > /sys/bus/pci/devices/$i/limits/sso "
+  echo 0 > /sys/bus/pci/devices/$i/limits/sso 
+  echo " echo 0 > /sys/bus/pci/devices/$i/limits/ssow "
+  echo 0 > /sys/bus/pci/devices/$i/limits/ssow 
+
+done
+echo ""
+
+echo 0  > /sys/bus/pci/devices/0002:0e:00.0/limits/tim
+echo 1  > /sys/bus/pci/devices/0002:0e:00.0/limits/npa
+echo 16 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
+# set limit 26 for 8 or less core
+echo 26 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+# set limit 32 for 8 or more core
+#echo 32 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+#echo 46 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+
+
+
+#####################################################
+#   from slac converstaion
+#####################################################
+
+write_limits_cpt(){
+echo "echo $1 >  /sys/bus/pci/devices/$2/limits/cpt"
+echo $1 >  /sys/bus/pci/devices/$2/limits/cpt
+check=$(cat /sys/bus/pci/devices/$2/limits/cpt)
+echo "read check: $check"
+}
+
+
+write_limits_cpt 0 '0002:0a:00.0'
+write_limits_cpt 0 '0002:0b:00.0'
+write_limits_cpt 0 '0002:0c:00.0'
+write_limits_cpt 0 '0002:0d:00.0'
+write_limits_cpt 0 '0002:0e:00.0'
+write_limits_cpt 0 '0002:10:00.0'
+write_limits_cpt 64 '0002:10:00.0'
+
+#echo 0 > /sys/bus/pci/devices/0002:0a:00.0/limits/cpt
+#echo 0 > /sys/bus/pci/devices/0002:0b:00.0/limits/cpt
+#echo 0 > /sys/bus/pci/devices/0002:0c:00.0/limits/cpt
+#echo 0 > /sys/bus/pci/devices/0002:0d:00.0/limits/cpt
+#echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/cpt
+#echo 0 > /sys/bus/pci/devices/0002:10:00.0/limits/cpt
+#echo 64 > /sys/bus/pci/devices/0002:10:00.0/limits/cpt
+
+
 #//////////////////////////////////
 
-banner "Network "
+banner "Network   ethdev  a063"
 dpdk_unbind_bind "0002:04:00.0";
 dpdk_unbind_bind "0002:05:00.0";
 
 
-banner "event dev  (SSO) "
+banner "event dev  (SSO) a0f9 "
+# tell vfio about SSO
 dpdk_unbind_bind "0002:0e:00.0";
 
 
-banner "mempool  (fpa) "
+banner "mempool  (fpa)  0afb"
 dpdk_unbind_bind "0002:0d:00.0";
 # dpdk_unbind_bind "0002:0f:00.0";
 
 
+banner "crypto    a0fe"
+echo "dpdk-devbind.py -u 0002:10:00.0"
+dpdk-devbind.py -u 0002:10:00.0
+echo "echo '0002:10:00.0' > /sys/bus/pci/drivers/octeontx2-cpt/bind"
+echo '0002:10:00.0' > /sys/bus/pci/drivers/octeontx2-cpt/bind
 
-banner "crypto "
-dpdk_unbind_bind "0002:10:00.0";
+echo "echo 23 > /sys/bus/pci/devices/0002\:10\:00.0/sriov_numvfs"
+echo 23 > /sys/bus/pci/devices/0002\:10\:00.0/sriov_numvfs
+check=$( cat /sys/bus/pci/devices/0002\:10\:00.0/sriov_numvfs )
+echo "read check: $check"
+
+# bind the new vfs to vfio-pci
+CPT_VF=$(lspci -d:a0fe  | cut -d ' ' -f 1)
+for i in $CPT_VF  ; do
+
+  echo " dpdk-devbind.py --bind=vfio-pci $i "
+   dpdk-devbind.py --bind=vfio-pci $i 
+done
+
 
 
 
