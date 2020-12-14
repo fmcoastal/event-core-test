@@ -41,16 +41,11 @@
 #include <rte_mbuf.h>
 
 #include <rte_eventdev.h>
-#include <rte_crypto.h>
-#include <rte_cryptodev.h>
-#include <rte_event_crypto_adapter.h>
-
 
 #include <rte_spinlock.h>
 #include "fs_tstamp.h"
 #include "fs_lpm_test.h"
- //  #include "fs_core.h"
-#include "fs_crypto.h"
+#include "fs_ethdev.h"
 
 
 
@@ -107,181 +102,41 @@ o-------------> | |    flow 1   | |      |
 //       maybe later, i will increase the number of queues and try to inject a timer event.
 
 
-// extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core time stamp
-// extern uint64_t  g_per_core_result[]; // per core time stamp
+extern const char * StringSched[];    // defined in fs_core.c
 
 
-#if 0
-????  not sure what to do on this.....
-
-  Hash algo:    sha256
-  Hash value:   20c800b78a602e5e37a78a79222da6937a9cb22f9d14dad7137e7b09a4c5f907
-  Sign algo:    sha256,rsa2048:dev
-  Sign value:   0f490c9a3f16a146b52a131662c15e2147a276f8fbbed20c2dfb24e04dbecc306a38ebbe1061fa5777b8b30ad795b5a0c6dc564607e247dcc22dad85d7266c8cb1ce3bff0e0cb9c2005b28c7f680c2406ab07a1125de5a6e7737df281fc6cee2aee6379f164bfc5997a9a89873718c2f08a96f7e32254fee53162c922192a34cfc3708d81f3ee2e58b7bdec8da08a27e294f4f9b807301b647aeb095f20edec64ab61a5aeb72d967af72b4c5c3ece4288e5b2df9b0a9992366cc18747ecdd10e6a6dd2a967f23435c2942c413b012dbe1b920aabc2a97bbabad485eeac50f4ca88ea424854a3f9dc196ad617a82a21e4f15e9643132ce4734e7c5fa59c2a78ae
+extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core time stamp
+extern uint64_t  g_per_core_result[]; // per core time stamp
 
 
-
-#endif
-char  c_m0[] = { "Killroy"        };
-char  c_m1[] = { "was"         };
-char  c_m2[] = { "there"       };
-char  c_m3[] = { ":-)"};
-char * cpt_message[] = {c_m0,c_m1,c_m2,c_m3};
-
-
-
-
-void print_rte_event_dev_info(struct rte_event_dev_info * p);
-void print_rte_event_dev_info(struct rte_event_dev_info * p)
-{ 
-char s[]={"   "};
-    printf("%sstruct rte_event_dev_info: \n",s);
-    printf("%s    char *        driver_name  %s \n",s,p->driver_name);
-    printf("%s    rte_device * dev          %p \n",s,p->dev);
-    printf("%s    uint32_t     min_dequeue_timeout_ns           0x%08x \n",s,p->min_dequeue_timeout_ns         ); 
-    printf("%s    uint32_t     max_dequeue_timeout_ns           0x%08x \n",s,p->max_dequeue_timeout_ns         );  
-    printf("%s    uint32_t     dequeue_timeout_ns               0x%08x \n",s,p->dequeue_timeout_ns             );  
-    printf("%s    uint8_t      max_event_queues                 0x%02x \n",s,p->max_event_queues               ); 
-    printf("%s    uint32_t     max_event_queue_flows            0x%08x \n",s,p->max_event_queue_flows          ); 
-    printf("%s    uint8_t      max_event_queue_priority_levels  0x%02x \n",s,p->max_event_queue_priority_levels); 
-    printf("%s    uint8_t      max_event_priority_levels        0x%02x \n",s,p->max_event_priority_levels      ); 
-    printf("%s    uint8_t      max_event_ports                  0x%02x \n",s,p->max_event_ports                ); 
-    printf("%s    uint8_t      max_event_port_dequeue_depth     0x%02x \n",s,p->max_event_port_dequeue_depth   ); 
-    printf("%s    uint32_t     max_event_port_enqueue_depth     0x%08x \n",s,p->max_event_port_enqueue_depth   ); 
-    printf("%s    int32_t      max_num_events                   0x%08x \n",s,p->max_num_events                 ); 
- }                                                                                  
-
-                                                                                    
-void print_rte_event_port_conf( struct rte_event_port_conf * p);
-void print_rte_event_port_conf( struct rte_event_port_conf * p)
-{ 
-char s[]={"   "};
-    printf("%sdefault: event port config  -> def_p_conf \n",s);
-    printf("%sstruct rte_event_port_conf: \n",s);
-    printf("%s    int32_t 	new_event_threshold       0x%08x \n",s,p->new_event_threshold      );
-    printf("%s    uint16_t 	dequeue_depth             0x%08x \n",s,p->dequeue_depth            ); 
-    printf("%s    uint16_t 	enqueue_depth             0x%08x \n",s,p->enqueue_depth            ); 
-    printf("%s    uint32_t 	disable_implicit_release  0x%02x \n",s,p->disable_implicit_release );
- }                                                                                  
-                                                                               
-                                                                                    
-                                                                                    
-/*********************************************************************              
- *********************************************************************              
- *           REGULAR SPINLOCK TEST                                   *              
- *********************************************************************              
+/*********************************************************************
+ *********************************************************************
+ *           REGULAR SPINLOCK TEST                                   *
+ *********************************************************************
  *********************************************************************/
 
-// extern rte_spinlock_t g_spinlock_measure_lock;
+extern rte_spinlock_t g_spinlock_measure_lock;
 #define SpinLockFunction()  rte_spinlock_lock( &g_spinlock_measure_lock); rte_spinlock_unlock( &g_spinlock_measure_lock);
 
 //  forward reference for compiler
-int        crypto_setup( __attribute__((unused))void * arg);
-int         crypto_loop( __attribute__((unused))void * arg);
-int        crypto_print( __attribute__((unused))void * arg);
-int      crypto_cleanup( __attribute__((unused))void * arg);
-void crypto_description( void);
+int        ethdev_setup( __attribute__((unused))void * arg);
+int         ethdev_loop( __attribute__((unused))void * arg);
+int        ethdev_print( __attribute__((unused))void * arg);
+int      ethdev_cleanup( __attribute__((unused))void * arg);
+void ethdev_description( void);
 
 
-// FIGURE OUT THE four VARIABLE BELOW LATER
-extern const char * StringSched[];
-extern uint8_t g_evt_dev_id;    // this variable should be moved out of the fs_core file to a global evnet_dev_id for 
-int g_cdev_id=0;                  // device id of the crypto device.   
-                                // all eveent devices using the same SSO instance....
-uint8_t g_nb_crypto_PortsPerCore ; 
-uint8_t g_nb_crypto_QueuesPerCore ; 
-
-int event_crypto_init(void);
-// I will use   43.1.1  RTE_EVENT_CRYPTO_ADAPTER_OP_NEW mode
-//     RTE_EVENT_CRYPTO_ADAPTER_CAP_INTERNAL_PORT_OP_FWD = RTE_EVENT_CRYPTO_ADAPTER_OP_NEW
-//   I will try to use a Symetric encryption algoritm
-//   <dpdk>/examples/fips_validation/main.c"
+uint8_t g_evt_dev_id;
+uint8_t g_nb_PortsPerCore ; 
+uint8_t g_nb_QueuesPerCore ; 
 
 
-
-int  event_crypto_init(void)
-{
-struct rte_event_dev_info dev_info;
-struct rte_event_port_conf conf = {0};
-enum rte_event_crypto_adapter_mode mode;
-int result;
-uint32_t caps; 
-
-
-   printf(" rte_event_dev_count() = %d \n",rte_event_dev_count() );
-   if (!rte_event_dev_count())
-   {
-         /* If there is no hardware eventdev, or no software vdev was
-          * specified on the command line, create an instance of
-          * event_sw.
-          */
-          printf(" no event dev  device found:\n"); 
-          printf("    did you create bind the SSO  to vfio-cpi?\n"); 
-          return -1 ;
-   }
-
-
-
-   printf(" rte_crypto_dev_count() = %d \n",rte_cryptodev_count() );
-   if ( rte_cryptodev_count() == 0 )
-   {
-      printf(" no crypto devices found:\ni"); 
-      printf("    did you create vf's and  bind them to vfio-cpi?\n"); 
-      printf("    did you add a -w 0002:10:00.x  to the app's rte arguments?\n");
-      return -2 ;
-   } 
-
-
-   printf("**************************************************************\n");
-   printf("***********crypto*********************************************\n");
-   printf("**************************************************************\n");
-   printf("**************************************************************\n");
-   printf(" %s call rte_event_dev_info_get() %s\n",C_GREEN,C_NORMAL);
-   result  = rte_event_dev_info_get(g_evt_dev_id, &dev_info);
-
-   if (result != 0)  printf( " rte_event_dev_info_get() failed: %d\n",result);
-
-   print_rte_event_dev_info(&dev_info);
-
-   conf.new_event_threshold = dev_info.max_num_events;
-   conf.dequeue_depth = dev_info.max_event_port_dequeue_depth;
-   conf.enqueue_depth = dev_info.max_event_port_enqueue_depth;
-   print_rte_event_port_conf( &conf);
- 
-
-   mode = RTE_EVENT_CRYPTO_ADAPTER_OP_FORWARD ;
-   printf(" %s call rte_event_crypto_adapter_create() %s\n",C_GREEN,C_NORMAL);
-   result = rte_event_crypto_adapter_create(g_evt_dev_id, g_cdev_id, &conf, mode);
-   if (result != 0)  printf( " rte_event_crypto_adapter_create() failed: %d\n",result);
-
-   printf(" rte_crypto_dev_count() = %d \n",rte_cryptodev_count() );
-
-// get capabilities of crypto dev:
-    printf(" %s call rte_event_crypto_adapter_caps_get() %s\n",C_GREEN,C_NORMAL);
-   result = rte_event_crypto_adapter_caps_get(g_evt_dev_id, g_cdev_id, &caps);
-   if (result != 0)  printf( " rte_event_crypto_adapter_caps_get() failed: %d\n",result);
-
-   printf(" crcaps = 0x%08x\n",caps);
-
-//rte_event_crypto_adapter_create()
-
-//   struct rte_cryptodev_qp_conf qp_conf = {128, NULL, NULL};
-
-//   struct rte_cryptodev_config conf = {rte_socket_id(), 1, 0};
-//   ret = rte_cryptodev_configure(env.dev_id, &conf);
-
-   rte_event_dev_close (g_cdev_id);
-   return 0;
-}
-
-
-
-int crypto_setup( __attribute__((unused)) void * arg)
+int ethdev_setup( __attribute__((unused)) void * arg)
 {
 int     result;
-uint8_t      i;
 unsigned int nb_lcores = rte_lcore_count();
 
+uint8_t                       i;
 uint8_t                       nb_event_dev_devices = 0;
 struct  rte_event_dev_info    dev_info;
 struct  rte_event_dev_config  event_dev_config = {0};
@@ -318,29 +173,30 @@ uint32_t event_queue_cfg = 0;
             rte_exit(EXIT_FAILURE, "No Event Devices available");   
         }
         printf(" found %d event devices \n", nb_event_dev_devices);
-
+ 
+//  debug -print out all event dev devices
 //        int rte_event_dev_info_get (uint8_t dev_id, struct rte_event_dev_info *dev_info)
         for (i = 0 ; i < nb_event_dev_devices ; i++)
-        {   
+        {
            result = rte_event_dev_info_get(i,&dev_info);
-           printf("  %d)  %s\n",i, dev_info.driver_name); 
+           printf("  %d)  %s\n",i, dev_info.driver_name);
         }
-   
+//  My test- I expect just 1    
         if( nb_event_dev_devices != 1)
         {
             printf(" ** WARNING:: Number of  event dev devices found is not what is expected \n"); 
         }
         // WHY at least there is at least 1  device,  Index=0;
-        g_evt_dev_id = 0; 
+        g_evt_dev_id = 0;     // assign dev_id  to 0
 
 
-        g_nb_crypto_PortsPerCore = 1   ; 
-        g_nb_crypto_QueuesPerCore = 1  ; // should this be queues per port?  Should this be = number of cores??
+        g_nb_PortsPerCore = 1   ; 
+        g_nb_QueuesPerCore = 1  ; // should this be queues per port?  Should this be = number of cores??
    
         printf(" g_evt_dev_id:  %d \n",g_evt_dev_id);
         printf(" nb_lcores:      %d \n",nb_lcores);
-        printf(" g_nb_crypto_PortsPerCore:   %d \n",g_nb_crypto_PortsPerCore);
-        printf(" g_nb_crypto_QueuesPerCore:  %d \n",g_nb_crypto_QueuesPerCore);
+        printf(" g_nb_PortsPerCore:   %d \n",g_nb_PortsPerCore);
+        printf(" g_nb_QueuesPerCore:  %d \n",g_nb_QueuesPerCore);
    }
  
    { 
@@ -355,31 +211,30 @@ uint32_t event_queue_cfg = 0;
         printf("      struct rte_event_dev_info: \n");
         printf("          char *        driver_name  %s \n",dev_info.driver_name);
         printf("          rte_device * dev          %p \n",dev_info.dev);
-        printf("          uint32_t     min_dequeue_timeout_ns           0x%08x \n",dev_info.min_dequeue_timeout_ns         );  	
-        printf("          uint32_t     max_dequeue_timeout_ns           0x%08x \n",dev_info.max_dequeue_timeout_ns         );  	
-        printf("          uint32_t     dequeue_timeout_ns               0x%08x \n",dev_info.dequeue_timeout_ns             );  	
-        printf("          uint8_t      max_event_queues                 0x%02x \n",dev_info.max_event_queues               ); 	
-        printf("          uint32_t     max_event_queue_flows            0x%08x \n",dev_info.max_event_queue_flows          );  	
-        printf("          uint8_t      max_event_queue_priority_levels  0x%02x \n",dev_info.max_event_queue_priority_levels); 	
-        printf("          uint8_t      max_event_priority_levels        0x%02x \n",dev_info.max_event_priority_levels      ); 	
-        printf("          uint8_t      max_event_ports                  0x%02x \n",dev_info.max_event_ports                ); 	
-        printf("          uint8_t      max_event_port_dequeue_depth     0x%02x \n",dev_info.max_event_port_dequeue_depth   ); 	
-        printf("          uint32_t     max_event_port_enqueue_depth     0x%08x \n",dev_info.max_event_port_enqueue_depth   );  	
-        printf("          int32_t      max_num_events                   0x%08x \n",dev_info.max_num_events                 ); 	
-        printf("          uint32_t     event_dev_cap                    0x%08x \n",dev_info.event_dev_cap                  );  	
+        printf("          uint32_t     min_dequeue_timeout_ns           0x%08x \n",dev_info.min_dequeue_timeout_ns         );  //uint32_t 	
+        printf("          uint32_t     max_dequeue_timeout_ns           0x%08x \n",dev_info.max_dequeue_timeout_ns         );  //uint32_t 	
+        printf("          uint32_t     dequeue_timeout_ns               0x%08x \n",dev_info.dequeue_timeout_ns             );  //uint32_t 	
+        printf("          uint8_t      max_event_queues                 0x%02x \n",dev_info.max_event_queues               );  //uint8_t 	
+        printf("          uint32_t     max_event_queue_flows            0x%08x \n",dev_info.max_event_queue_flows          );  //uint32_t 	
+        printf("          uint8_t      max_event_queue_priority_levels  0x%02x \n",dev_info.max_event_queue_priority_levels);  //uint8_t 	
+        printf("          uint8_t      max_event_priority_levels        0x%02x \n",dev_info.max_event_priority_levels      );  //uint8_t 	
+        printf("          uint8_t      max_event_ports                  0x%02x \n",dev_info.max_event_ports                );  //uint8_t 	
+        printf("          uint8_t      max_event_port_dequeue_depth     0x%02x \n",dev_info.max_event_port_dequeue_depth   );  //uint8_t 	
+        printf("          uint32_t     max_event_port_enqueue_depth     0x%08x \n",dev_info.max_event_port_enqueue_depth   );  //uint32_t 	
+        printf("          int32_t      max_num_events                   0x%08x \n",dev_info.max_num_events                 );  //int32_t 	
+        printf("          uint32_t     event_dev_cap                    0x%08x \n",dev_info.event_dev_cap                  );  //uint32_t 	
     
-   // check compatability
+   // check compatability - make sure queue will accept any type of RTE_SCHED_TYPE_* values: 
+   //                                 ordered,parallel,atomic,ethdev,ccryptodev,timer,...
         if (dev_info.event_dev_cap & RTE_EVENT_DEV_CAP_QUEUE_ALL_TYPES)
              event_queue_cfg |= RTE_EVENT_QUEUE_CFG_ALL_TYPES;
-
-
 
      //////  rte_event_dev_configure()
     
         event_dev_config.dequeue_timeout_ns          = 0;                      // uint32_t     0 use Default values
         event_dev_config.nb_events_limit             = -1;                     // int32_t ??? I started with 100 and got errors, but l3fwd has -1, so copy for notw;
-        event_dev_config.nb_event_queues             = (uint8_t)g_nb_crypto_QueuesPerCore * nb_lcores;  // uint8_t   
-        event_dev_config.nb_event_ports              = (uint8_t)g_nb_crypto_PortsPerCore  * nb_lcores;  // uint8_t   
+        event_dev_config.nb_event_queues             = (uint8_t)g_nb_QueuesPerCore * nb_lcores;  // uint8_t   
+        event_dev_config.nb_event_ports              = (uint8_t)g_nb_PortsPerCore  * nb_lcores;  // uint8_t   
         event_dev_config.nb_event_queue_flows        = 1024;                  // uint32_t 
         event_dev_config.nb_event_port_dequeue_depth = 1;                     // uint32_t   cpy l3fwd->needs to be 1 because we do in hw?
         event_dev_config.nb_event_port_enqueue_depth = 1;                     // uint32_t cpy l3fwd->needs to be 1 because we do in hw?
@@ -397,8 +252,8 @@ uint32_t event_queue_cfg = 0;
         printf("          uint32_t nb_event_port_dequeue_depth  x 0x%08x \n", event_dev_config.nb_event_port_dequeue_depth  );   	
         printf("          uint32_t nb_event_port_enqueue_depth  x 0x%08x \n", event_dev_config.nb_event_port_enqueue_depth  );   	
         printf("          uint32_t event_dev_cfg                  0x%08x \n", event_dev_config.event_dev_cfg                );   	
-
-        printf(" %scall rte_event_dev_configure() %s\n",C_GREEN,C_NORMAL);
+    
+        printf(" %scall rte_event_dev_configure() %s\n",C_GREEN,C_NORMAL); 
         result = rte_event_dev_configure(g_evt_dev_id, &event_dev_config);
         if(result < 0)
         {
@@ -414,7 +269,7 @@ uint32_t event_queue_cfg = 0;
 //////   Get default event_queue Setting and  Capabilities
         int ret;
 
-            printf(" %scall rte_event_queue_default_conf_get() %s\n",C_GREEN,C_NORMAL);
+            printf(" %scall rte_event_queue_default_conf_get() %s\n",C_GREEN,C_NORMAL);    
             rte_event_queue_default_conf_get(g_evt_dev_id, event_q_id, &def_q_conf);
             
             printf(" default: event dev -> queue info event_q_id=%d \n",event_q_id);
@@ -426,15 +281,11 @@ uint32_t event_queue_cfg = 0;
                                                                  ,StringSched[def_q_conf.schedule_type]             );  //  	
             printf("          uint8_t  priority                     0x%02x \n", def_q_conf.priority                  );  //  	
             
-
-
             event_q_conf.nb_atomic_flows           = 1024;
             event_q_conf.nb_atomic_order_sequences = 1024;
             event_q_conf.event_queue_cfg           = event_queue_cfg;
        //     event_q_conf.schedule_type             = RTE_EVENT_QUEUE_CFG_ALL_TYPES ;
             event_q_conf.priority                  = RTE_EVENT_DEV_PRIORITY_NORMAL ;
-
-
             
             if (def_q_conf.nb_atomic_flows < event_q_conf.nb_atomic_flows)
                 event_q_conf.nb_atomic_flows = def_q_conf.nb_atomic_flows;
@@ -502,8 +353,8 @@ uint32_t event_queue_cfg = 0;
             if (!evt_rsrc->evp.event_p_id)
                 rte_panic("Failed to allocate memory for Event Ports\n");
            */
-       
-            printf(" %scall rte_event_port_default_conf_get() %s\n",C_GREEN,C_NORMAL);
+      
+            printf(" %scall rte_event_port_default_conf_get() %s\n",C_GREEN,C_NORMAL); 
             rte_event_port_default_conf_get(g_evt_dev_id, 0, &def_p_conf);
 
             printf(" default: event port config  -> def_p_conf \n");
@@ -517,7 +368,7 @@ uint32_t event_queue_cfg = 0;
             event_p_conf.dequeue_depth = 32,
             event_p_conf.enqueue_depth = 32,
             event_p_conf.new_event_threshold = 4096;
-
+ 
 
      if (def_p_conf.new_event_threshold < event_p_conf.new_event_threshold)
          event_p_conf.new_event_threshold =
@@ -534,9 +385,9 @@ uint32_t event_queue_cfg = 0;
 114         evt_rsrc->disable_implicit_release;
 115
 */
-       event_p_conf.disable_implicit_release = 0 ; // WHAT IS THIS ????
-
-
+       event_p_conf.disable_implicit_release = 0 ; // marvell extension  see:
+                                                   //  "<dpdk>/lib/librte_eventdev/rte_eventdev.h
+                                                     
             printf(" Config: event port config  -> event_p_conf \n");
             printf("      struct rte_event_port_conf *\n") ; 
             printf("          int32_t  new_event_threshold        0x%08x \n", event_p_conf.new_event_threshold      );    	
@@ -544,8 +395,7 @@ uint32_t event_queue_cfg = 0;
             printf("          uint16_t enqueue_depth              0x%04x \n", event_p_conf.enqueue_depth            );    	
             printf("          uint8_t  disable_implicit_release   0x%02x \n", event_p_conf.disable_implicit_release );  
 
-
-     for (event_p_id = 0; event_p_id < (g_nb_crypto_PortsPerCore * nb_lcores) ; event_p_id++) {
+     for (event_p_id = 0; event_p_id < (g_nb_PortsPerCore * nb_lcores) ; event_p_id++) {
          printf(" %scall rte_event_port_setup() for event_p_id %d %s\n",C_GREEN,event_p_id,C_NORMAL);
          ret = rte_event_port_setup(g_evt_dev_id, event_p_id,  &event_p_conf);
          if (ret < 0)
@@ -580,7 +430,7 @@ uint32_t event_queue_cfg = 0;
        uint8_t 	priorities_array[32];
        uint16_t nb_links = 1; 
 
-        for (event_p_id = 0; event_p_id < (g_nb_crypto_PortsPerCore * nb_lcores) ; event_p_id++) 
+        for (event_p_id = 0; event_p_id < (g_nb_PortsPerCore * nb_lcores) ; event_p_id++) 
         {
            queues_array[0] = event_p_id ;
            priorities_array[0] = RTE_EVENT_DEV_PRIORITY_NORMAL ;
@@ -611,12 +461,6 @@ uint32_t event_queue_cfg = 0;
     }
 
 
-
-
-
-     event_crypto_init();
-
-
 //////
 //////  rte_event_dev_start()
 //////
@@ -637,33 +481,23 @@ uint32_t event_queue_cfg = 0;
             printf(" Event Dev Device Started successfully \n");
         }
      }
-
-
      return 0;
 }
 
-
 void print_struct_rte_event( const char * string,struct rte_event *p);
-#if 0
-void print_struct_rte_event( const char * string,struct rte_event *p)
-{
-        printf("  %s        add:%p  \n"   , string  ,p        );
-        printf("     flow_id        %d \n", p->flow_id        );
-        printf("     sub_event_type %d \n", p->sub_event_type );
-        printf("     event_type     %d \n", p->event_type     );
-        printf("     op             %d \n", p->op             );
-        printf("     sched_type     %d \n", p->sched_type     );
-        printf("     queue_id       %d \n", p->queue_id       );
-        printf("     priority       %d \n", p->priority       );
-        printf("     event_ptr      %p \n", p->event_ptr       );
-}
-#endif
+
 
 #define LOCK_LOOPS (10*10)
 #define BATCH_SIZE  4
 
+char  ethdev_m0[] = { "Another"        };
+char  ethdev_m1[] = { "Brick"         };
+char  ethdev_m2[] = { "In the"       };
+char  ethdev_m3[] = { "wall"};
+char * ethdev_message[] = {ethdev_m0,ethdev_m1,ethdev_m2,ethdev_m3};
 
-int crypto_loop( __attribute__((unused)) void * arg)
+
+int ethdev_loop( __attribute__((unused)) void * arg)
 {
     unsigned lcore_id;
 //    char string[256];
@@ -693,7 +527,7 @@ int crypto_loop( __attribute__((unused)) void * arg)
         printf("        lcore_id: %d \n ",lcore_id);
       
         ev.event=0;    // set "event union" to 0
-        ev.event_ptr  = (void *) (cpt_message[lcore_id]) ;  // set the second 64 bits to point at a payload
+        ev.event_ptr  = (void *) (ethdev_message[lcore_id]) ;  // set the second 64 bits to point at a payload
 
 // In order to get sso to deliver, I had to add the following to the WQE
         ev.flow_id        = 0xDEAD;                 // uint32_t flow_id:20;
@@ -739,14 +573,14 @@ int crypto_loop( __attribute__((unused)) void * arg)
         print_struct_rte_event( "event[0]",&events[0]);
         printf(" Message:   %s\n",(char *)events[0].event_ptr);
 
-        printf("  c%d) Send cpt_message to next Port (aka core for me)  %d events\n",lcore_id,next_core[lcore_id]);
+        printf("  c%d) Send message to next Port (aka core for me)  %d events\n",lcore_id,next_core[lcore_id]);
 
         // set to forward to next core.
         events[0].queue_id       = next_core[lcore_id];
         // set operation to forward packet    
         //  events[0].op             = RTE_EVENT_OP_FORWARD;
         events[0].flow_id        += 1;
-        events[0].event_ptr  = (void *)cpt_message[lcore_id]; 
+        events[0].event_ptr  = (void *)ethdev_message[lcore_id]; 
 
  
         rte_pause();
@@ -767,7 +601,7 @@ int crypto_loop( __attribute__((unused)) void * arg)
     return 0;
 }
 
-int crypto_print(__attribute__((unused)) void * arg)
+int ethdev_print(__attribute__((unused)) void * arg)
 {
 //    int32_t x = -1 ;
 //    if (arg != NULL ) x = *(int32_t *)arg;
@@ -784,7 +618,7 @@ int crypto_print(__attribute__((unused)) void * arg)
      return 0;
 }
 
-int crypto_cleanup(__attribute__((unused)) void * arg)
+int ethdev_cleanup(__attribute__((unused)) void * arg)
 {
      // print the results from each core
 
@@ -809,21 +643,21 @@ Close an event device. The device cannot be restarted! */
      return 0;
 }
 
-void  crypto_description(void)
+void  ethdev_description(void)
 {
-    printf(" \"crypto\" - send a packt to the crypto engine to encrypt \n");
-    printf("                then send the result to decrypt\n");
-    printf("                loop\n");
+    printf(" \"ethdev\" - try to set up event mode with event_ethdev to pass traffic\n");
+    printf("                in and out of board.  Later add RSS to spread acroos \n");
+    printf("                mulitple cores \n");
 }
 
 
 
-struct test_mode_struct  tm_crypto = {
-      .setup         = crypto_setup,
-      .main_loop     = crypto_loop,
-      .print_results = crypto_print,
-      .cleanup       = crypto_cleanup,
-      .description   = crypto_description,
+struct test_mode_struct  tm_ethdev = {
+      .setup         = ethdev_setup,
+      .main_loop     = ethdev_loop,
+      .print_results = ethdev_print,
+      .cleanup       = ethdev_cleanup,
+      .description   = ethdev_description,
 };
 
 

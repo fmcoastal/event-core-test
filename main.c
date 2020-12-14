@@ -48,6 +48,7 @@
 #include "fs_lpm_test.h"
 #include "fs_core.h"
 #include "fs_crypto.h"
+#include "fs_ethdev.h"
 
 
 // GLOBAL DEFINITIONS REFERENCED BY TEST FUNCTIONS
@@ -137,6 +138,7 @@ void usage(void)
     printf("  %d",4);   tm_lpm.description();
     printf("  %d",5);   tm_core.description();
     printf("  %d",6);   tm_crypto.description();
+    printf("  %d",7);   tm_ethdev.description();
     printf("  %d",0);   tm_dummy.description();
     printf("\n"); 
 }
@@ -161,6 +163,9 @@ void usage(void)
                  g_tst_func  = tm_core;
          else if ( g_test_selection  == 6)
                  g_tst_func  = tm_crypto;
+         else if ( g_test_selection  == 7)
+                 g_tst_func  = tm_ethdev;
+
 
 
 
