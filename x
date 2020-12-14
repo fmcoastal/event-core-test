@@ -9,7 +9,8 @@ if [ "$1" == "" ] ; then
    echo " test 3:  ???  "
    echo " test 4:  Longest prefix match test code "
    echo " test 5:  event dev, moce message to next core   "
-   echo " test 6:  crypto  "
+   echo " test 6:  event crypto  "
+   echo " test 7:  event ethdev  "
    exit
 else
    RUN_CODE=$1
@@ -48,8 +49,9 @@ elif  [ "$RUN_CODE" == "6" ] ; then
 
 # https://doc.dpdk.org/guides/cryptodevs/octeontx2.html
 # lets try to run crypto code
+#  REFERENCE CODE :  <DPDK>/app/test/test_event_crypto_adapter.c
 
-./build/core_test_app -c 0x0f -w 0002:0e:00.0,xae_cnt=32768  –log-level=’pmd.crypto.octeontx2,8’  -- -t 6
+./build/core_test_app -c 0x0f -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1 –log-level=’pmd.crypto.octeontx2,8’  -- -t 6
 
 #create vf instance of crypto driver
 # https://doc.dpdk.org/guides/cryptodevs/octeontx2.html
@@ -64,6 +66,13 @@ elif  [ "$RUN_CODE" == "6" ] ; then
 # http://doc.dpdk.org/guides/prog_guide/event_crypto_adapter.html
 # https://doc.dpdk.org/guides/cryptodevs/
 # http://doc.dpdk.org/guides/prog_guide/rte_security.html 
+
+elif  [ "$RUN_CODE" == "7" ] ; then
+
+
+./build/core_test_app -c 0x0f -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1 –log-level=’pmd.crypto.octeontx2,8’  -- -t 7
+
+
 
 else
 echo "unrecognized script to run: $1"

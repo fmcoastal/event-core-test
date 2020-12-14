@@ -10,6 +10,7 @@ SRCS-y += fs_lpm_test.c
 SRCS-y += fs_spinlock_test.c
 SRCS-y += fs_core.c
 SRCS-y += fs_crypto.c
+SRCS-y += fs_ethdev.c
 
 # Build using pkg-config variables if possible
 ifeq ($(shell pkg-config --exists libdpdk && echo 0),0)
