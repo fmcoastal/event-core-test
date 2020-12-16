@@ -42,7 +42,7 @@ elif [ "$RUN_CODE" == "5" ] ; then
 
 # ./build/core_test_app -c 0x0f --log-level otx2_logtype_sso:debug -- -t 5
 # ./build/core_test_app -c 0x0f -- -t 5
-   ./build/core_test_app -c 0x0f -w 0002:0e:00.0,xae_cnt=32768  -- -t 5
+   ./build/core_test_app -c 0x0f -w 0002:0e:00.0,xae_cnt=32768 -w 0002:04:00.0 -w 0002:05:00.0    -- -t 5
 # ./build/core_test_app -c 0x0f  -w 0002:0e:00.0,xae_cnt=32768  --log-level otx2_logtype_sso:debug -- -t 5
 
 elif  [ "$RUN_CODE" == "6" ] ; then
@@ -70,7 +70,7 @@ elif  [ "$RUN_CODE" == "6" ] ; then
 elif  [ "$RUN_CODE" == "7" ] ; then
 
 
-./build/core_test_app -c 0x0f -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1 –log-level=’pmd.crypto.octeontx2,8’  -- -t 7
+./build/core_test_app -c 0x0f -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:04:00.0 -w 0002:05:00.0   –log-level=’pmd.crypto.octeontx2,8’  -- -t 7
 
 
 
