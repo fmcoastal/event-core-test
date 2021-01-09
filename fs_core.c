@@ -49,8 +49,16 @@
 
 
 
-#include "main.h"
+#include "fs_extras.h"
 #include "fs_spinlock_test.h"
+
+#include <rte_event_eth_rx_adapter.h>
+#include <rte_event_eth_tx_adapter.h>
+#include "fs_print_rte_eventdev_struct.h"
+#include "fs_print_rte_ethdev_struct.h"
+
+
+
 
 
 #if 0
@@ -206,7 +214,7 @@ uint32_t event_queue_cfg = 0;
 //////////  rte_event_dev_configure()
 //////////
 //////////   Get default event_dev Setting and  Capabilities
-        printf(" %s call rte_event_dev_info_get() %s\n",C_GREEN,C_NORMAL);
+        CALL_RTE("rte_event_dev_info_get()");
         result = rte_event_dev_info_get( g_evt_dev_id, &dev_info );
         printf(" result    %d \n",result);
         printf(" default: dev_info \n");
@@ -233,28 +241,23 @@ uint32_t event_queue_cfg = 0;
 
      //////  rte_event_dev_configure()
     
-        event_dev_config.dequeue_timeout_ns          = 0;                      // uint32_t     0 use Default values
-        event_dev_config.nb_events_limit             = -1;                     // int32_t ??? I started with 100 and got errors, but l3fwd has -1, so copy for notw;
+        event_dev_config.dequeue_timeout_ns          = 0;            // uint32_t     0 use Default values
+        event_dev_config.nb_events_limit             = -1;           // int32_t ??? I started with 100 and got errors, but l3fwd has -1, so copy for notw;
         event_dev_config.nb_event_queues             = (uint8_t)g_nb_QueuesPerCore * nb_lcores;  // uint8_t   
         event_dev_config.nb_event_ports              = (uint8_t)g_nb_PortsPerCore  * nb_lcores;  // uint8_t   
-        event_dev_config.nb_event_queue_flows        = 1024;                  // uint32_t 
-        event_dev_config.nb_event_port_dequeue_depth = 1;                     // uint32_t   cpy l3fwd->needs to be 1 because we do in hw?
-        event_dev_config.nb_event_port_enqueue_depth = 1;                     // uint32_t cpy l3fwd->needs to be 1 because we do in hw?
+        event_dev_config.nb_event_queue_flows        = 1024;         // uint32_t 
+        event_dev_config.nb_event_port_dequeue_depth = 1;            // uint32_t   cpy l3fwd->needs to be 1 because we do in hw?
+        event_dev_config.nb_event_port_enqueue_depth = 1;            // uint32_t cpy l3fwd->needs to be 1 because we do in hw?
 //////    event_dev_config.event_dev_cfg           = dev_info.event_dev_cap;  // uint32_t 
-        event_dev_config.event_dev_cfg               = 0;                     // uint32_t   again copy what l3fwd has to see if we get the same respons
-    
-    
-        printf(" config values for event_dev_config \n");
-        printf("      struct rte_event_dev_config:  \n");
-        printf("          uint32_t dequeue_timeout_ns             0x%08x \n", event_dev_config.dequeue_timeout_ns           );   	
-        printf("          int32_t  nb_events_limit     x          0x%08x \n", event_dev_config.nb_events_limit              );  //why int vs uint ? 	
-        printf("          uint8_t  nb_event_queues     x          0x%02x \n", event_dev_config.nb_event_queues              );   	
-        printf("          uint8_t  nb_event_ports                 0x%02x \n", event_dev_config.nb_event_ports               );   	
-        printf("          uint32_t nb_event_queue_flows     x     0x%08x \n", event_dev_config.nb_event_queue_flows         );   	
-        printf("          uint32_t nb_event_port_dequeue_depth  x 0x%08x \n", event_dev_config.nb_event_port_dequeue_depth  );   	
-        printf("          uint32_t nb_event_port_enqueue_depth  x 0x%08x \n", event_dev_config.nb_event_port_enqueue_depth  );   	
-        printf("          uint32_t event_dev_cfg                  0x%08x \n", event_dev_config.event_dev_cfg                );   	
-    
+        event_dev_config.event_dev_cfg               = 0;            // uint32_t   again copy what l3fwd has to see if we get the same respons
+
+
+#ifdef PRINT_CALL_ARGUMENTS
+        FONT_CYAN();
+        printf(  " Call Args: g_evt_dev_id  %d  event_dev_config: \n",g_evt_dev_id );
+        FONT_NORMAL();
+#endif
+        print_rte_event_dev_config( 0, "config values for event_dev_config",0,&event_dev_config);   
         printf(" %scall rte_event_dev_configure() %s\n",C_GREEN,C_NORMAL); 
         result = rte_event_dev_configure(g_evt_dev_id, &event_dev_config);
         if(result < 0)
@@ -298,7 +301,7 @@ uint32_t event_queue_cfg = 0;
                             def_q_conf.nb_atomic_order_sequences;
             
             event_q_conf.event_queue_cfg = event_queue_cfg;
-//            event_q_conf.schedule_type = evt_rsrc->sched_type;
+//            event_q_conf.schedule_type = g_glob.sched_type;
             event_q_conf.schedule_type = RTE_SCHED_TYPE_ATOMIC ;  /*RTE_SCHED_TYPE_ATOMIC,RTE_SCHED_TYPE_ORDERED,RTE_SCHED_TYPE_PARALLEL */
 /*            evt_rsrc->evq.event_q_id = (uint8_t *)malloc(sizeof(uint8_t) * evt_rsrc->evq.nb_queues);
 

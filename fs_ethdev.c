@@ -43,14 +43,26 @@
 #include <rte_eventdev.h>
 
 #include <rte_spinlock.h>
+#include "fs_extras.h"
 #include "fs_tstamp.h"
 #include "fs_lpm_test.h"
 #include "fs_ethdev.h"
 
 
 
-#include "main.h"
 #include "fs_spinlock_test.h"
+//#include "fs_print_structures.c"
+// eth dev structures
+
+#include "fs_extras.h"
+#include <rte_event_eth_rx_adapter.h>
+#include <rte_event_eth_tx_adapter.h>
+#include "fs_print_rte_eventdev_struct.h"
+#include "fs_print_rte_ethdev_struct.h"
+
+
+//#include "fs_print_rte_structures.h"
+
 
 
 #if 0
@@ -108,6 +120,18 @@ extern const char * StringSched[];    // defined in fs_core.c
 extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core time stamp
 extern uint64_t  g_per_core_result[]; // per core time stamp
 
+///////////////////
+//ethdev
+////////////////
+#define RTE_ETHDEV_RX_DESC_DEFAULT 1024     /* not sure what this is - is it an event  */
+#define RTE_ETHDEV_TX_DESC_DEFAULT 1024
+#define MEMPOOL_CACHE_SIZE 256
+#define MAX_PKT_BURST 32
+
+#define RTE_RX_DESC_DEFAULT 1024
+#define RTE_TX_DESC_DEFAULT 1024
+
+
 
 /*********************************************************************
  *********************************************************************
@@ -125,10 +149,381 @@ int        ethdev_print( __attribute__((unused))void * arg);
 int      ethdev_cleanup( __attribute__((unused))void * arg);
 void ethdev_description( void);
 
+//#define RTE_MAX_ETHPORTS 8
 
-uint8_t g_evt_dev_id;
+struct event_rx_adptr {
+        uint32_t service_id;
+        uint8_t nb_rx_adptr;
+        uint8_t *rx_adptr;
+};
+
+struct event_tx_adptr {
+        uint32_t service_id;
+        uint8_t nb_tx_adptr;
+        uint8_t *tx_adptr;
+};
+
+struct event_queues {
+        uint8_t *event_q_id;
+        uint8_t nb_queues;
+};
+
+struct event_ports {
+        uint8_t *event_p_id;
+        uint8_t nb_ports;
+        rte_spinlock_t lock;
+};
+
+
+
+
+
+typedef struct global_data_struct {
+   uint16_t enabled_port_mask   ;   //two ports handled by vfio-pci  
+   uint16_t nb_ports_available  ;
+   uint16_t event_d_id;             // event dev device ID index.
+   uint16_t sched_type;
+   struct rte_mempool*   p_pktmbuf_pool ;
+   struct rte_ether_addr eth_addr[RTE_MAX_ETHPORTS]; 
+   struct rte_event_port_conf def_p_conf;
+   struct event_rx_adptr rx_adptr;
+   struct event_tx_adptr tx_adptr;
+   struct event_queues evq;
+   struct event_ports evp;
+
+
+} global_data;  
+
+global_data g_glob;
+
+//uint8_t g_evt_dev_id;  g_glob.event_d_id
 uint8_t g_nb_PortsPerCore ; 
 uint8_t g_nb_QueuesPerCore ; 
+
+
+static char C_RED[]   ={0x1b,'[','3','1','m',0x00};  // GREEN=$'\e[32m'
+//static char C_GREEN[]   ={0x1b,'[','3','2','m',0x00};  // GREEN=$'\e[32m'
+//static char C_CYAN[]   ={0x1b,'[','3','6','m',0x00};  // GREEN=$'\e[32m'
+static char C_WHITE[]   ={0x1b,'[','3','7','m',0x00};  // GREEN=$'\e[32m'
+
+
+// initialize each port
+void      initialize_eth_dev_ports(void);
+void     initialize_eth_dev_ports(void)
+{         
+    uint16_t port_id;
+    int ret;
+    uint16_t nb_rxd = RTE_RX_DESC_DEFAULT;
+    uint16_t nb_txd = RTE_TX_DESC_DEFAULT;
+    uint32_t nb_mbufs;
+    uint16_t nb_ports;
+
+
+    struct rte_eth_conf port_conf = {
+           .rxmode = {
+                  .max_rx_pkt_len = RTE_ETHER_MAX_LEN,
+                  .split_hdr_size = 0,
+           },
+           .txmode = {
+                   .mq_mode = ETH_MQ_TX_NONE,
+           },
+    };
+
+    WAI();
+// for event mode 
+// note the RSS reference    
+    port_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
+    port_conf.rx_adv_conf.rss_conf.rss_key = NULL;
+    port_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
+
+    print_rte_eth_conf(0,"default: port_conf",0,&port_conf);    
+/*   printf(" struct rte_eth_conf     \n");
+    printf(" port_conf.rxmode.mq_mode         %d \n", port_conf.rxmode.mq_mode);
+    printf(" port_conf.rxmode.max_rx_pkt_len  %d \n", port_conf.rxmode.max_rx_pkt_len );
+    printf(" port_conf.rxmode.split_hdr_size  %d \n", port_conf.rxmode.split_hdr_size);
+    printf(" port_conf.txmode.mq_mode         %d \n", port_conf.txmode.mq_mode);
+    printf(" port_conf.rx_adv_conf.rss_conf.rss_key  0x%p \n", port_conf.rx_adv_conf.rss_conf.rss_key);
+    printf(" port_conf.rx_adv_conf.rss_conf.rss_hf   %ld \n", port_conf.rx_adv_conf.rss_conf.rss_hf);
+*/
+
+//   allocate mbuffs for the eth-dev interface HW.
+    nb_ports = 2;  // FS -EVOL  I set this to 2 because I am going to use 2 etherent connections.  
+
+    nb_mbufs = RTE_MAX(nb_ports * (RTE_ETHDEV_RX_DESC_DEFAULT +
+                                   RTE_ETHDEV_TX_DESC_DEFAULT +
+                                   MAX_PKT_BURST + rte_lcore_count() *
+                                   MEMPOOL_CACHE_SIZE), 8192U);
+
+    printf(" We think we need  %d mbufs\n",nb_mbufs );
+    /* create the mbuf pool */
+
+   
+    CALL_RTE("rte_pktmbuf_pool_create()");    
+    g_glob.p_pktmbuf_pool = rte_pktmbuf_pool_create("mbuf_pool",
+
+                    nb_mbufs, MEMPOOL_CACHE_SIZE, 0,
+                    RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+    if (g_glob.p_pktmbuf_pool == NULL)
+            rte_panic("Cannot init mbuf pool (g_p_pktmbuf_pool)  \n");
+        
+
+
+    RTE_ETH_FOREACH_DEV(port_id) {
+         struct rte_eth_conf local_port_conf = port_conf;
+         struct rte_eth_dev_info dev_info;
+         struct rte_eth_rxconf rxq_conf;
+         struct rte_eth_txconf txq_conf;
+
+          /* skip ports that are not enabled */
+          if ((g_glob.enabled_port_mask & (1 << port_id)) == 0) {
+                  printf("Skipping disabled port %u\n", port_id);
+                  continue;
+          }
+          g_glob.nb_ports_available++;
+         /* init port */
+          printf("Initializing port %u... ", port_id);
+          printf ("%s %s  portid: %d %s\n",C_RED,__FUNCTION__,port_id,C_WHITE);
+          fflush(stdout);
+
+#ifdef PRINT_CALL_ARGUMENTS
+               FONT_CYAN();
+               printf(  " Call Args: port_id %d  dev_info: \n",port_id);
+               FONT_NORMAL();
+#endif
+          CALL_RTE("rte_eth_dev_info_get()");    
+          ret = rte_eth_dev_info_get(port_id, &dev_info);
+          if (ret != 0)
+                  rte_panic("Error during getting device (port %u) info: %s\n",
+                            port_id, strerror(-ret));
+          local_port_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
+          if (local_port_conf.rx_adv_conf.rss_conf.rss_hf != port_conf.rx_adv_conf.rss_conf.rss_hf) {
+                  printf("Port %u modified RSS hash function based on hardware support,"
+                        "requested:%#"PRIx64" configured:%#"PRIx64"",
+                          port_id,
+                          port_conf.rx_adv_conf.rss_conf.rss_hf,
+                          local_port_conf.rx_adv_conf.rss_conf.rss_hf );
+          }
+
+          if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
+                  local_port_conf.txmode.offloads |=
+                          DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+ 
+#ifdef PRINT_CALL_ARGUMENTS
+          FONT_CYAN();
+          printf(  " Call Args: port_id %d  rx_queuess:%d  tx_queues %d  local_port_conf: \n",port_id,1,1);
+          FONT_NORMAL();
+#endif
+          CALL_RTE("rte_eth_dev_configure()");    
+          ret = rte_eth_dev_configure(port_id, 1, 1, &local_port_conf);
+          if (ret < 0)
+                  rte_panic("Cannot configure device: err=%d, port=%u\n",
+                            ret, port_id);
+
+ #ifdef PRINT_CALL_ARGUMENTS
+          FONT_CYAN();
+          printf(  " Call Args: port_id %d  nb_rxd :%d  nb_txd:%d \n",port_id,nb_rxd,nb_txd);
+          FONT_NORMAL();
+#endif
+          CALL_RTE("call rte_eth_dev_adjust_nb_rx_tx_desc()");    
+          ret = rte_eth_dev_adjust_nb_rx_tx_desc(port_id, &nb_rxd,
+                                                 &nb_txd);
+          if (ret < 0)
+                  rte_panic("Cannot adjust number of descriptors: err=%d, port=%u\n",
+                            ret, port_id);
+
+          CALL_RTE("call rte_eth_macaddr_get()");    
+          rte_eth_macaddr_get(port_id, &g_glob.eth_addr[port_id]);
+
+          /* init one RX queue */
+          fflush(stdout);
+          printf("port_id = %d\n",port_id);
+          printf("nb_rxd = %d\n",nb_rxd);
+          printf("rte_eth_dev_socket_id(port_id) = %d\n",rte_eth_dev_socket_id(port_id));
+          rxq_conf = dev_info.default_rxconf;
+          rxq_conf.offloads = local_port_conf.rxmode.offloads;
+
+#ifdef PRINT_CALL_ARGUMENTS
+          FONT_CYAN();
+          printf(  " Call Args: port_id %d  rx_queue_id:%d  nb_rx_desc:%d  socketid:%d  rx_conf:   rte_mempool* \n",
+                                     port_id,           0,      nb_rxd,  rte_eth_dev_socket_id(port_id));
+          FONT_NORMAL();
+#endif
+          CALL_RTE("rte_eth_rx_queue_setup()");    
+          ret = rte_eth_rx_queue_setup(port_id, 0, nb_rxd,
+                                       rte_eth_dev_socket_id(port_id),
+                                       &rxq_conf,
+                                       g_glob.p_pktmbuf_pool);
+          if (ret < 0)
+                  rte_panic("rte_eth_rx_queue_setup:err=%d, port=%u\n",
+                            ret, port_id);
+
+          /* init one TX queue on each port */
+          fflush(stdout);
+          txq_conf = dev_info.default_txconf;
+          txq_conf.offloads = local_port_conf.txmode.offloads;
+          CALL_RTE("rte_eth_tx_queue_setup()");    
+          ret = rte_eth_tx_queue_setup(port_id, 0, nb_txd,
+                          rte_eth_dev_socket_id(port_id),
+                          &txq_conf);
+          if (ret < 0)
+                  rte_panic("rte_eth_tx_queue_setup:err=%d, port=%u\n",
+                            ret, port_id);
+
+          CALL_RTE("rte_eth_promiscuous_enable()\n");    
+          rte_eth_promiscuous_enable(port_id);
+
+          printf("Port %u,MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n\n",
+                  port_id,
+                  g_glob.eth_addr[port_id].addr_bytes[0],
+                  g_glob.eth_addr[port_id].addr_bytes[1],
+                  g_glob.eth_addr[port_id].addr_bytes[2],
+                  g_glob.eth_addr[port_id].addr_bytes[3],
+                  g_glob.eth_addr[port_id].addr_bytes[4],
+                  g_glob.eth_addr[port_id].addr_bytes[5]);
+    }  // FOR_EACH_ETHDEV
+
+
+}
+
+
+
+void  rx_tx_adapter_setup_internal_port(void);
+void  rx_tx_adapter_setup_internal_port(void)
+{
+	        struct rte_event_eth_rx_adapter_queue_conf eth_q_conf;
+        uint8_t event_d_id = g_glob.event_d_id;   
+        uint16_t adapter_id = 0;
+        uint16_t nb_adapter = 0;
+        uint16_t port_id;
+        uint8_t q_id = 0;
+        int ret;
+WAI();
+
+        memset(&eth_q_conf, 0, sizeof(eth_q_conf));
+        eth_q_conf.ev.priority = RTE_EVENT_DEV_PRIORITY_NORMAL;
+
+        RTE_ETH_FOREACH_DEV(port_id) {
+                if ((g_glob.enabled_port_mask & (1 << port_id)) == 0)
+                        continue;
+                nb_adapter++;
+        }
+
+       g_glob.rx_adptr.nb_rx_adptr = nb_adapter;
+
+        CALL_RTE("malloc()");
+        g_glob.rx_adptr.rx_adptr = (uint8_t *)malloc(sizeof(uint8_t) *
+                                        g_glob.rx_adptr.nb_rx_adptr);
+        if (!g_glob.rx_adptr.rx_adptr) {
+                free(g_glob.evp.event_p_id);
+                free(g_glob.evq.event_q_id);
+                rte_panic("Failed to allocate memery for Rx adapter\n");
+        }
+
+
+        RTE_ETH_FOREACH_DEV(port_id) {
+                if ((g_glob.enabled_port_mask & (1 << port_id)) == 0)
+                        continue;
+
+#ifdef PRINT_CALL_ARGUMENTS
+               FONT_CYAN();
+               printf(  " Call Args: adapter_id %d  event_d_id %d  rte_event_port_conf: \n",adapter_id,event_d_id);
+               FONT_NORMAL();
+#endif
+                print_rte_event_port_conf(1,"---create--- def_p_conf",adapter_id,&g_glob.def_p_conf);
+                CALL_RTE("rte_event_eth_rx_adapter_create()");
+                ret = rte_event_eth_rx_adapter_create(adapter_id, event_d_id,
+                                                &g_glob.def_p_conf);
+                if (ret)
+                        rte_panic("Failed to create rx adapter[%d]\n",
+                                  adapter_id);
+
+
+                /* Configure user requested sched type*/
+                eth_q_conf.ev.sched_type = g_glob.sched_type;
+                eth_q_conf.ev.queue_id =  g_glob.evq.event_q_id[q_id];
+
+#ifdef PRINT_CALL_ARGUMENTS
+               FONT_CYAN();
+               printf(" Call Args: id:rx_adapter_id %d  eth_dev_id:port_id %d   rx_queue_id: %d  struct rte_event_eth_rx_adapter_queue_conf: \n",adapter_id,port_id,-1);
+               FONT_NORMAL();
+#endif
+                print_rte_event_eth_rx_adapter_queue_conf(1,"--add-- eth_q_conf",adapter_id,&eth_q_conf);
+                CALL_RTE("rte_event_eth_rx_adapter_queue_add()");
+                ret = rte_event_eth_rx_adapter_queue_add(adapter_id, port_id,
+                                                         -1, &eth_q_conf);
+                if (ret)
+                        rte_panic("Failed to add queues to Rx adapter\n");
+
+                CALL_RTE("rte_event_eth_rx_adapter_start(uint8_t id)");
+                ret = rte_event_eth_rx_adapter_start(adapter_id);
+                if (ret)
+                        rte_panic("Rx adapter[%d] start Failed\n", adapter_id);
+
+                g_glob.rx_adptr.rx_adptr[adapter_id] = adapter_id;
+                adapter_id++;
+                if (q_id < g_glob.evq.nb_queues)
+                        q_id++;
+        }
+
+        g_glob.tx_adptr.nb_tx_adptr = nb_adapter;
+        CALL_RTE("malloc()");
+        g_glob.tx_adptr.tx_adptr = (uint8_t *)malloc(sizeof(uint8_t) *
+                                        g_glob.tx_adptr.nb_tx_adptr);
+        if (!g_glob.tx_adptr.tx_adptr) {
+                free(g_glob.rx_adptr.rx_adptr);
+                free(g_glob.evp.event_p_id);
+                free(g_glob.evq.event_q_id);
+                rte_panic("Failed to allocate memery for Rx adapter\n");
+        }
+
+        adapter_id = 0;
+        RTE_ETH_FOREACH_DEV(port_id) {
+                if ((g_glob.enabled_port_mask & (1 << port_id)) == 0)
+                        continue;
+
+                print_rte_event_port_conf(1,"---create--- def_p_conf",port_id,&g_glob.def_p_conf);
+#ifdef PRINT_CALL_ARGUMENTS
+                FONT_CYAN();
+                printf(" Call Args: adpater_id: %d, event_d_id:%d, struct def_p_conf)\n",
+                                        adapter_id,
+                                        event_d_id );
+                FONT_NORMAL();
+#endif
+                 print_rte_event_port_conf(1,"---create--- def_p_conf",adapter_id ,&g_glob.def_p_conf);
+
+                CALL_RTE("rte_event_eth_tx_adapter_create()");
+                ret = rte_event_eth_tx_adapter_create(adapter_id, event_d_id,
+                                                &(g_glob.def_p_conf));
+                if (ret)
+                        rte_panic("Failed to create tx adapter[%d]\n",
+                                  adapter_id);
+
+#ifdef PRINT_CALL_ARGUMENTS
+                FONT_CYAN();
+                printf( " Call Args:  id:%d,uint16_t eth_dev_id:%d,int32_t queue:%d)\n",
+                            adapter_id, port_id, -1);
+                FONT_NORMAL();
+#endif
+                CALL_RTE("rte_event_eth_tx_adapter_queue_add()");
+                ret = rte_event_eth_tx_adapter_queue_add(adapter_id, port_id,
+                                                         -1);
+                if (ret)
+                        rte_panic("Failed to add queues to Tx adapter\n");
+                CALL_RTE("rte_event_eth_tx_adapter_start()");
+                ret = rte_event_eth_tx_adapter_start(adapter_id);
+                if (ret)
+                        rte_panic("Tx adapter[%d] start Failed\n", adapter_id);
+
+                g_glob.tx_adptr.tx_adptr[adapter_id] = adapter_id;
+                adapter_id++;
+        }
+
+}
+
+
+
+
+
 
 
 int ethdev_setup( __attribute__((unused)) void * arg)
@@ -146,6 +541,34 @@ uint8_t                       event_q_id = 0;
 struct  rte_event_queue_conf  def_q_conf;        // queue
 struct  rte_event_queue_conf  event_q_conf; 
 uint32_t event_queue_cfg = 0;
+
+   WAI();
+
+    g_glob.enabled_port_mask = 0x03 ;
+    g_glob.nb_ports_available = 0;
+    g_glob.event_d_id = 0;
+    memset(&(g_glob.def_p_conf), 0, sizeof(struct rte_event_port_conf));
+    g_glob.def_p_conf.dequeue_depth =1;        
+    g_glob.def_p_conf.enqueue_depth =1;
+    g_glob.def_p_conf.new_event_threshold = -1;
+    g_glob.sched_type = RTE_SCHED_TYPE_ATOMIC ;   //RTE_SCHED_TYPE_ORDERED  RTE_SCHED_TYPE_PARALLEL
+
+
+
+// INFO
+   printf("rte_event_dev_count() = %d \n",rte_event_dev_count());
+   printf("rte_eth_dev_count_avail() = %d \n",rte_eth_dev_count_avail());
+
+
+/////////////////////  
+/////////////////////  
+/////////////////////  
+/////////////////////  
+//  Set up ethdev interfaces
+
+    initialize_eth_dev_ports();
+   
+
 
 //uint8_t                       event_p_id = 0;
 //struct  rte_event_port_conf
@@ -172,7 +595,8 @@ uint32_t event_queue_cfg = 0;
             printf(" did you forget to bind at least 1 to vfio-pci\n");
             rte_exit(EXIT_FAILURE, "No Event Devices available");   
         }
-        printf(" found %d event devices \n", nb_event_dev_devices);
+        WAI();
+	printf(" Found %d event devices\n", nb_event_dev_devices);
  
 //  debug -print out all event dev devices
 //        int rte_event_dev_info_get (uint8_t dev_id, struct rte_event_dev_info *dev_info)
@@ -187,13 +611,13 @@ uint32_t event_queue_cfg = 0;
             printf(" ** WARNING:: Number of  event dev devices found is not what is expected \n"); 
         }
         // WHY at least there is at least 1  device,  Index=0;
-        g_evt_dev_id = 0;     // assign dev_id  to 0
+         g_glob.event_d_id = 0;     // assign dev_id  to 0
 
 
         g_nb_PortsPerCore = 1   ; 
         g_nb_QueuesPerCore = 1  ; // should this be queues per port?  Should this be = number of cores??
    
-        printf(" g_evt_dev_id:  %d \n",g_evt_dev_id);
+        printf(" g_glob.event_d_id:  %d \n", g_glob.event_d_id);
         printf(" nb_lcores:      %d \n",nb_lcores);
         printf(" g_nb_PortsPerCore:   %d \n",g_nb_PortsPerCore);
         printf(" g_nb_QueuesPerCore:  %d \n",g_nb_QueuesPerCore);
@@ -204,25 +628,11 @@ uint32_t event_queue_cfg = 0;
 //////////  rte_event_dev_configure()
 //////////
 //////////   Get default event_dev Setting and  Capabilities
-        printf(" %s call rte_event_dev_info_get() %s\n",C_GREEN,C_NORMAL);
-        result = rte_event_dev_info_get( g_evt_dev_id, &dev_info );
+        CALL_RTE("rte_event_dev_info_get()");
+        result = rte_event_dev_info_get( g_glob.event_d_id , &dev_info );
         printf(" result    %d \n",result);
-        printf(" default: dev_info \n");
-        printf("      struct rte_event_dev_info: \n");
-        printf("          char *        driver_name  %s \n",dev_info.driver_name);
-        printf("          rte_device * dev          %p \n",dev_info.dev);
-        printf("          uint32_t     min_dequeue_timeout_ns           0x%08x \n",dev_info.min_dequeue_timeout_ns         );  //uint32_t 	
-        printf("          uint32_t     max_dequeue_timeout_ns           0x%08x \n",dev_info.max_dequeue_timeout_ns         );  //uint32_t 	
-        printf("          uint32_t     dequeue_timeout_ns               0x%08x \n",dev_info.dequeue_timeout_ns             );  //uint32_t 	
-        printf("          uint8_t      max_event_queues                 0x%02x \n",dev_info.max_event_queues               );  //uint8_t 	
-        printf("          uint32_t     max_event_queue_flows            0x%08x \n",dev_info.max_event_queue_flows          );  //uint32_t 	
-        printf("          uint8_t      max_event_queue_priority_levels  0x%02x \n",dev_info.max_event_queue_priority_levels);  //uint8_t 	
-        printf("          uint8_t      max_event_priority_levels        0x%02x \n",dev_info.max_event_priority_levels      );  //uint8_t 	
-        printf("          uint8_t      max_event_ports                  0x%02x \n",dev_info.max_event_ports                );  //uint8_t 	
-        printf("          uint8_t      max_event_port_dequeue_depth     0x%02x \n",dev_info.max_event_port_dequeue_depth   );  //uint8_t 	
-        printf("          uint32_t     max_event_port_enqueue_depth     0x%08x \n",dev_info.max_event_port_enqueue_depth   );  //uint32_t 	
-        printf("          int32_t      max_num_events                   0x%08x \n",dev_info.max_num_events                 );  //int32_t 	
-        printf("          uint32_t     event_dev_cap                    0x%08x \n",dev_info.event_dev_cap                  );  //uint32_t 	
+	printf(" default: dev_info \n");
+        print_rte_event_dev_info( &dev_info );
     
    // check compatability - make sure queue will accept any type of RTE_SCHED_TYPE_* values: 
    //                                 ordered,parallel,atomic,ethdev,ccryptodev,timer,...
@@ -242,19 +652,15 @@ uint32_t event_queue_cfg = 0;
         event_dev_config.event_dev_cfg               = 0;                     // uint32_t   again copy what l3fwd has to see if we get the same respons
     
     
-        printf(" config values for event_dev_config \n");
-        printf("      struct rte_event_dev_config:  \n");
-        printf("          uint32_t dequeue_timeout_ns             0x%08x \n", event_dev_config.dequeue_timeout_ns           );   	
-        printf("          int32_t  nb_events_limit     x          0x%08x \n", event_dev_config.nb_events_limit              );  //why int vs uint ? 	
-        printf("          uint8_t  nb_event_queues     x          0x%02x \n", event_dev_config.nb_event_queues              );   	
-        printf("          uint8_t  nb_event_ports                 0x%02x \n", event_dev_config.nb_event_ports               );   	
-        printf("          uint32_t nb_event_queue_flows     x     0x%08x \n", event_dev_config.nb_event_queue_flows         );   	
-        printf("          uint32_t nb_event_port_dequeue_depth  x 0x%08x \n", event_dev_config.nb_event_port_dequeue_depth  );   	
-        printf("          uint32_t nb_event_port_enqueue_depth  x 0x%08x \n", event_dev_config.nb_event_port_enqueue_depth  );   	
-        printf("          uint32_t event_dev_cfg                  0x%08x \n", event_dev_config.event_dev_cfg                );   	
+#ifdef PRINT_CALL_ARGUMENTS
+        FONT_CYAN();
+        printf(  " Call Args: g_glob.event_d_id  %d  event_dev_config: \n",g_glob.event_d_id );
+        FONT_NORMAL();
+#endif
+        print_rte_event_dev_config( 0, "config values for event_dev_config",0,&event_dev_config);   
     
-        printf(" %scall rte_event_dev_configure() %s\n",C_GREEN,C_NORMAL); 
-        result = rte_event_dev_configure(g_evt_dev_id, &event_dev_config);
+        CALL_RTE("rte_event_dev_configure()"); 
+        result = rte_event_dev_configure( g_glob.event_d_id, &event_dev_config);
         if(result < 0)
         {
              printf(" rte_event_dev_configure() returned %d\n",result);
@@ -268,9 +674,13 @@ uint32_t event_queue_cfg = 0;
 //////
 //////   Get default event_queue Setting and  Capabilities
         int ret;
-
-            printf(" %scall rte_event_queue_default_conf_get() %s\n",C_GREEN,C_NORMAL);    
-            rte_event_queue_default_conf_get(g_evt_dev_id, event_q_id, &def_q_conf);
+#ifdef PRINT_CALL_ARGUMENTS
+            FONT_CYAN();
+            printf(  " Call Args: g_glob.event_d_id:%d  event_q_id:%d  def_q_conf: \n",g_glob.event_d_id,event_q_id );
+            FONT_NORMAL();
+#endif
+            CALL_RTE("rte_event_queue_default_conf_get()");    
+            rte_event_queue_default_conf_get( g_glob.event_d_id , event_q_id, &def_q_conf);
             
             printf(" default: event dev -> queue info event_q_id=%d \n",event_q_id);
             printf("      struct rte_event_queue_conf *\n") ; 
@@ -296,31 +706,38 @@ uint32_t event_queue_cfg = 0;
                             def_q_conf.nb_atomic_order_sequences;
             
             event_q_conf.event_queue_cfg = event_queue_cfg;
-//            event_q_conf.schedule_type = evt_rsrc->sched_type;
-            event_q_conf.schedule_type = RTE_SCHED_TYPE_ATOMIC ;  /*RTE_SCHED_TYPE_ATOMIC,RTE_SCHED_TYPE_ORDERED,RTE_SCHED_TYPE_PARALLEL */
-/*            evt_rsrc->evq.event_q_id = (uint8_t *)malloc(sizeof(uint8_t) * evt_rsrc->evq.nb_queues);
+            event_q_conf.schedule_type = g_glob.sched_type;
+//            event_q_conf.schedule_type = RTE_SCHED_TYPE_ATOMIC ;  /*RTE_SCHED_TYPE_ATOMIC,RTE_SCHED_TYPE_ORDERED,RTE_SCHED_TYPE_PARALLEL */
+            CALL_RTE("malloc()");
+            g_glob.evq.event_q_id = (uint8_t *)malloc(sizeof(uint8_t) * g_glob.evq.nb_queues);
 
-            if (!evt_rsrc->evq.event_q_id)
+            if (!g_glob.evq.event_q_id)
                 rte_panic("Memory allocation failure\n");
             
-            for (event_q_id = 0; event_q_id < evt_rsrc->evq.nb_queues;
+            for (event_q_id = 0; event_q_id < g_glob.evq.nb_queues;
                                         event_q_id++) {
-                ret = rte_event_queue_setup(event_d_id, event_q_id,
+#ifdef PRINT_CALL_ARGUMENTS
+               FONT_CYAN();
+               printf(  " Call Args: g_glob.event_d_id:%d  event_q_id:%d  event_q_conf:\n",g_glob.event_d_id,event_q_id );
+               FONT_NORMAL();
+#endif
+                CALL_RTE("rte_event_queue_setup()");
+                ret = rte_event_queue_setup(g_glob.event_d_id, event_q_id,
                                 &event_q_conf);
                 if (ret < 0)
                     rte_panic("Error in configuring event queue\n");
-                evt_rsrc->evq.event_q_id[event_q_id] = event_q_id;
-           }  //  loop throug the queue Info. */
+                g_glob.evq.event_q_id[event_q_id] = event_q_id;
+           }  //  loop throug the queue Info. 
 
            // this is how I will configure each queue for this event dev:
-            printf(" Config: event queue config  -> event_q_conf \n");
-            printf("      struct rte_event_queue_conf *\n") ; 
-            printf("          uint32_t nb_atomic_flows              0x%08x \n", event_q_conf.nb_atomic_flows           );    	
-            printf("          uint32_t nb_atomic_order_sequences    0x%08x \n", event_q_conf.nb_atomic_order_sequences );    	
-            printf("          uint32_t event_queue_cfg              0x%08x \n", event_q_conf.event_queue_cfg           );    	
-            printf("          uint8_t  schedule_type                0x%02x (%s)\n", event_q_conf.schedule_type
+            printf("***  Config: event queue config  -> event_q_conf *** \n");
+            printf("         struct rte_event_queue_conf *\n") ; 
+            printf("             uint32_t nb_atomic_flows              0x%08x \n", event_q_conf.nb_atomic_flows           );    	
+            printf("             uint32_t nb_atomic_order_sequences    0x%08x \n", event_q_conf.nb_atomic_order_sequences );    	
+            printf("             uint32_t event_queue_cfg              0x%08x \n", event_q_conf.event_queue_cfg           );    	
+            printf("             uint8_t  schedule_type                0x%02x (%s)\n", event_q_conf.schedule_type
                                                                  ,StringSched[event_q_conf.schedule_type]             );    	
-            printf("          uint8_t  priority                     0x%02x \n", event_q_conf.priority                  );    	
+            printf("             uint8_t  priority                     0x%02x \n", event_q_conf.priority                  );    	
 
 
            // walk through the number event queues created as part of the event structure  
@@ -328,8 +745,14 @@ uint32_t event_queue_cfg = 0;
            {
              // above I set teh number of queues and the number of ports = number of cores:
              //    So I should loop through each evnet_q_ID.
-                 printf(" %scall rte_event_queue_setup() for event_q_id %d %s\n",C_GREEN,event_q_id, C_NORMAL);
-                 ret = rte_event_queue_setup(g_evt_dev_id , event_q_id,
+#ifdef PRINT_CALL_ARGUMENTS
+                 FONT_CYAN();
+                 printf(  " Call Args: g_glob.event_d_id:%d  event_q_id:%d  event_q_conf: \n",g_glob.event_d_id,event_q_id );
+                 FONT_NORMAL();
+#endif
+                 print_rte_event_queue_conf( 1 ,"event_q_id",event_q_id, &event_q_conf);
+                 CALL_RTE("call rte_event_queue_setup()");
+                 ret = rte_event_queue_setup(g_glob.event_d_id , event_q_id,
                                 &event_q_conf);
                 if (ret < 0)
                     rte_panic("Error in configuring event queue\n");
@@ -354,8 +777,8 @@ uint32_t event_queue_cfg = 0;
                 rte_panic("Failed to allocate memory for Event Ports\n");
            */
       
-            printf(" %scall rte_event_port_default_conf_get() %s\n",C_GREEN,C_NORMAL); 
-            rte_event_port_default_conf_get(g_evt_dev_id, 0, &def_p_conf);
+            CALL_RTE("rte_event_port_default_conf_get()"); 
+            rte_event_port_default_conf_get(g_glob.event_d_id, 0, &def_p_conf);
 
             printf(" default: event port config  -> def_p_conf \n");
             printf("      struct rte_event_port_conf *\n") ; 
@@ -396,27 +819,25 @@ uint32_t event_queue_cfg = 0;
             printf("          uint8_t  disable_implicit_release   0x%02x \n", event_p_conf.disable_implicit_release );  
 
      for (event_p_id = 0; event_p_id < (g_nb_PortsPerCore * nb_lcores) ; event_p_id++) {
-         printf(" %scall rte_event_port_setup() for event_p_id %d %s\n",C_GREEN,event_p_id,C_NORMAL);
-         ret = rte_event_port_setup(g_evt_dev_id, event_p_id,  &event_p_conf);
+
+#ifdef PRINT_CALL_ARGUMENTS
+         FONT_CYAN();
+         printf(  " Call Args: g_glob.event_d__id:%d  event_p_id:%d  event_p_conf: \n",g_glob.event_d_id,event_p_id );
+         FONT_NORMAL();
+#endif
+         print_rte_event_port_conf(1 , "event_p_conf", event_p_id, &event_p_conf);         
+         CALL_RTE("rte_event_port_setup()");
+         ret = rte_event_port_setup( g_glob.event_d_id , event_p_id,  &event_p_conf);
          if (ret < 0)
              rte_panic("Error in configuring event port %d\n",
                    event_p_id);
 
-/*         ret = rte_event_port_link(g_evt_dev_id, event_p_id, NULL,
-                       NULL, 0);
-         if (ret < 0)
-             rte_panic("Error in linking event port %d to queue\n",
-                   event_p_id);
-         evt_rsrc->evp.event_p_id[event_p_id] = event_p_id;
-*/
 
-//131         /* init spinlock */  // spin lock on what???
-//132         rte_spinlock_init(&evt_rsrc->evp.lock);
        }
 
 //135     evt_rsrc->def_p_conf = event_p_conf;
 
-       }
+     }
 
 //////
 //////  rte_event_port_link()
@@ -429,16 +850,26 @@ uint32_t event_queue_cfg = 0;
        uint8_t 	queues_array[32];
        uint8_t 	priorities_array[32];
        uint16_t nb_links = 1; 
+       int      index;
 
         for (event_p_id = 0; event_p_id < (g_nb_PortsPerCore * nb_lcores) ; event_p_id++) 
         {
            queues_array[0] = event_p_id ;
            priorities_array[0] = RTE_EVENT_DEV_PRIORITY_NORMAL ;
 
-           printf(" Linking Port %d to queue %d \n",event_p_id,event_p_id);
+           printf(" Linking Ports  event_d_id:%d, event_port_id:%d to event_queue_id %d \n",g_glob.event_d_id,event_p_id,event_p_id);
+#ifdef PRINT_CALL_ARGUMENTS
+          FONT_CYAN();
 
-           printf(" %scall rte_event_port_link() for event_p_id %d %s\n",C_GREEN,event_p_id,C_NORMAL);
-           ret = rte_event_port_link ( g_evt_dev_id , event_p_id, queues_array, priorities_array, nb_links);
+          printf(" Call Args: event_d_id:%d, event_p_id:%d   <queue array>  <priority array> nb_links%d \n",g_glob.event_d_id,event_p_id,nb_links);
+          printf(  "     Index:     queue_array   prioritys_array \n" );
+          printf(  "                             (high:%d  low:%d)  \n",RTE_EVENT_DEV_PRIORITY_HIGHEST, RTE_EVENT_DEV_PRIORITY_LOWEST );
+          for ( index = 0 ; index < nb_links ; index++)
+          printf(  "       %d             %d             %d \n",index, *(queues_array+index),*(priorities_array+index) );
+          FONT_NORMAL();
+ #endif
+           CALL_RTE("rte_event_port_link()");
+           ret = rte_event_port_link ( g_glob.event_d_id , event_p_id, queues_array, priorities_array, nb_links);
            if (ret != nb_links )
            {
               rte_panic("Error in rte_event_port_link() requested %d successfull %d\n",nb_links,ret);
@@ -446,12 +877,24 @@ uint32_t event_queue_cfg = 0;
         }
     }
 
+/////
+/////
+/////  Configure rte_event_eth_rx/tx_adapters
+/////
+/////
+     rx_tx_adapter_setup_internal_port();
+
+
+
+
+
+
     {
         uint32_t  evdev_service_id = 0;
         int32_t ret;
         //  THis might be for SW version of event dev MGR???  But sure what this is and how it is used.
-        printf(" %scall  rte_event_dev_service_id_get()  %s\n",C_GREEN,C_NORMAL);
-        ret = rte_event_dev_service_id_get(g_evt_dev_id,
+        CALL_RTE("rte_event_dev_service_id_get()");
+        ret = rte_event_dev_service_id_get( g_glob.event_d_id,
                                 &evdev_service_id);
         if (ret != -ESRCH && ret != 0) {
                 printf("Error getting the service ID for sw eventdev\n");
@@ -470,7 +913,7 @@ uint32_t event_queue_cfg = 0;
         int32_t ret;
  
         printf(" %scall rte_event_dev_start() %s\n",C_GREEN,C_NORMAL);
-        ret = rte_event_dev_start( g_evt_dev_id );
+        ret = rte_event_dev_start( g_glob.event_d_id );
         if (  ret  < 0)
         {
                 printf(" Event Dev Device Start failed:  %d \n",ret);
@@ -481,10 +924,13 @@ uint32_t event_queue_cfg = 0;
             printf(" Event Dev Device Started successfully \n");
         }
      }
+
+
+
      return 0;
 }
 
-void print_struct_rte_event( const char * string,struct rte_event *p);
+extern void print_struct_rte_event( const char * string,struct rte_event *p);
 
 
 #define LOCK_LOOPS (10*10)
@@ -514,7 +960,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
     uint16_t ret;
 
     lcore_id = rte_lcore_id();
-    dev_id = g_evt_dev_id;
+    dev_id = g_glob.event_d_id;
     port_id = lcore_id; 
 
     if( lcore_id == 0 )
@@ -622,13 +1068,13 @@ int ethdev_cleanup(__attribute__((unused)) void * arg)
 {
      // print the results from each core
 
-     rte_event_dev_dump( g_evt_dev_id  ,stdout);
+     rte_event_dev_dump( g_glob.event_d_id  ,stdout);
 
 
 // Stop the device
 
     printf("************\n    stopping the event_dev device  sso   \n***************\n");
-     rte_event_dev_stop (g_evt_dev_id);
+     rte_event_dev_stop (g_glob.event_d_id);
 
 //   CLose the event dev device
 
@@ -638,8 +1084,16 @@ int ethdev_cleanup(__attribute__((unused)) void * arg)
 /* int rte_event_dev_close (   uint8_t     dev_id  )   
 Close an event device. The device cannot be restarted! */
     printf("************\n    closing the event_dev device  sso   \n***************\n");
-     rte_event_dev_close( g_evt_dev_id   );
- 
+     rte_event_dev_close( g_glob.event_d_id );
+
+
+/* clear ethdev resourcesi*/
+/* free the mbuff pool */
+#if 0
+    USED L2FWD_EVENT as example and this buffer is never freed
+    printf("************\n    free teh pktmbuf_pool  event_dev device  sso   \n***************\n");
+          rte_pktmbuf_free(g_p_pktmbuf_pool);
+#endif
      return 0;
 }
 

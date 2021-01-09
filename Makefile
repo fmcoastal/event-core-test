@@ -11,6 +11,8 @@ SRCS-y += fs_spinlock_test.c
 SRCS-y += fs_core.c
 SRCS-y += fs_crypto.c
 SRCS-y += fs_ethdev.c
+SRCS-y += fs_print_rte_eventdev_struct.c
+SRCS-y += fs_print_rte_ethdev_struct.c
 
 # Build using pkg-config variables if possible
 ifeq ($(shell pkg-config --exists libdpdk && echo 0),0)
@@ -26,6 +28,7 @@ PKGCONF ?= pkg-config
 
 PC_FILE := $(shell $(PKGCONF) --path libdpdk 2>/dev/null)
 CFLAGS += -O3 $(shell $(PKGCONF) --cflags libdpdk)
+
 # Add flag to allow experimental API as l2fwd uses rte_ethdev_set_ptype API
 CFLAGS += -DALLOW_EXPERIMENTAL_API
 LDFLAGS_SHARED = $(shell $(PKGCONF) --libs libdpdk)
@@ -56,8 +59,8 @@ RTE_TARGET ?= $(notdir $(abspath $(dir $(firstword $(wildcard $(RTE_SDK)/*/.conf
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-USE_GDB="NO"
-#USE_GDB="YES"
+#USE_GDB="NO"
+USE_GDB="YES"
 ifeq ($(USE_GDB),"NO")
 CFLAGS += -O3
 else  #debug info
