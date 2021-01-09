@@ -7,102 +7,116 @@ echo 0xa0f9 - SSO devices
 echo 0xa0fb - mempool devices - pf
 echo 0xa0fd - crypto devices - pf
 
-
-if [ 0 ] ; then 
-echo "177d a0f9" >  /sys/bus/pci/drivers/vfio-pci/new_id
-dpdk-devbind.py -s | grep a0f9
-
-
-#echo 0 > /sys/bus/pci/devices/0002:07:00.0/limits/sso
-#echo 0 > /sys/bus/pci/devices/0002:08:00.0/limits/sso
-#echo 0 > /sys/bus/pci/devices/0002:09:00.0/limits/sso
-echo 0 > /sys/bus/pci/devices/0002:0a:00.0/limits/sso
-echo 0 > /sys/bus/pci/devices/0002:0b:00.0/limits/sso
-echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
-
-#echo 0 > /sys/bus/pci/devices/0002:07:00.0/limits/ssow
-#echo 0 > /sys/bus/pci/devices/0002:08:00.0/limits/ssow
-#echo 0 > /sys/bus/pci/devices/0002:09:00.0/limits/ssow
-echo 0 > /sys/bus/pci/devices/0002:0a:00.0/limits/ssow
-echo 0 > /sys/bus/pci/devices/0002:0b:00.0/limits/ssow
-echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
-
-#manually reset driver limits
-
-
-echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/tim
-echo 1 > /sys/bus/pci/devices/0002:0e:00.0/limits/npa
-echo 16 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
-# set limit 26 for 8 or less core
-echo 26 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
-# set limit 32 for 8 or more core
-#echo 32 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
-#echo 46 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
-
-
-ETH3=0002:04:00.0 
-ETH4=0002:05:00.0 
-
-NETWORK_DEVICES="$ETH0 $ETH1 $ETH2 $ETH3 $ETH4 $ETH5 $ETH6 $ETH7"
-
-for i in $NETWORK_DEVICES ; do
-
-            dpdk-devbind.py -u  $i
-            dpdk-devbind.py --bind=vfio-pci  $i 
-done
- 
-            
-echo "...done"
+echo #--  inform vfio_pci about SSO  --" 
+     echo "177d a0f9" >  /sys/bus/pci/drivers/vfio-pci/new_id
+     dpdk-devbind.py -s | grep a0f9
+     
+     #echo 0 > /sys/bus/pci/devices/0002:07:00.0/limits/sso
+     #echo 0 > /sys/bus/pci/devices/0002:08:00.0/limits/sso
+     #echo 0 > /sys/bus/pci/devices/0002:09:00.0/limits/sso
+     echo 0 > /sys/bus/pci/devices/0002:0a:00.0/limits/sso
+     echo 0 > /sys/bus/pci/devices/0002:0b:00.0/limits/sso
+     echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
+     
+     #echo 0 > /sys/bus/pci/devices/0002:07:00.0/limits/ssow
+     #echo 0 > /sys/bus/pci/devices/0002:08:00.0/limits/ssow
+     #echo 0 > /sys/bus/pci/devices/0002:09:00.0/limits/ssow
+     echo 0 > /sys/bus/pci/devices/0002:0a:00.0/limits/ssow
+     echo 0 > /sys/bus/pci/devices/0002:0b:00.0/limits/ssow
+     echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+     
+     #manually reset driver limits
+     
+     echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/tim
+     echo 1 > /sys/bus/pci/devices/0002:0e:00.0/limits/npa
+     echo 16 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
+     # set limit 26 for 8 or less core
+     echo 26 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+     # set limit 32 for 8 or more core
+     #echo 32 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+     #echo 46 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+     
+     #unbind
+     echo 0002:0e:00.0 > /sys/bus/pci/devices/0002\:0e\:00.0/driver/unbind
+     echo 0002:0e:00.0 > /sys/bus/pci/drivers/vfio-pci/bind
 
 
 
+echo #--  inform vfio_pci about eth devices  --" 
+     echo '177d a063' > /sys/bus/pci/drivers/vfio-pci/new_id
 
-exit
+     ETH3=0002:04:00.0 
+     ETH4=0002:05:00.0 
+     
+     NETWORK_DEVICES="$ETH0 $ETH1 $ETH2 $ETH3 $ETH4 $ETH5 $ETH6 $ETH7"
+     
+     for i in $NETWORK_DEVICES ; do
+     
+                 dpdk-devbind.py -u  $i
+                 dpdk-devbind.py --bind=vfio-pci  $i 
+     done
+      
+     echo "...done"
+     
+     exit
 
-MARVELL_PCI_DEVS=`lspci -d177d:`
-echo "Reset RVU devices limits"
-for dev in $(echo "$MARVELL_PCI_DEVS" | grep 'f9\|fb\|fd' | cut -d ' ' -f 1); do
-echo $dev
-echo 0 > /sys/bus/pci/devices/$dev/limits/cpt
-echo 0 > /sys/bus/pci/devices/$dev/limits/sso
-echo 0 > /sys/bus/pci/devices/$dev/limits/ssow
-done
-echo "Setup NET devices"
-net_list="0002:02:00.0 0002:06:00.0"
-echo '177d a063' > /sys/bus/pci/drivers/vfio-pci/new_id
-for dev in $(echo "$MARVELL_PCI_DEVS" | grep "63" | cut -d ' ' -f 1); do
-    echo $dev
-    for item in $net_list; do
-        if [ $dev == $item ]; then
-            echo $dev > /sys/bus/pci/drivers/octeontx2-nicpf/unbind
-            echo $dev > /sys/bus/pci/drivers/vfio-pci/bind
-            echo "...done"
-        fi
-    done
-done
-echo "Setup SSO device 0002:0e:00.0"
-echo '177d a0f9' > /sys/bus/pci/drivers/vfio-pci/new_id
-echo 24 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
-echo 48 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
-echo 0002:0e:00.0 > /sys/bus/pci/devices/0002\:0e\:00.0/driver/unbind
-echo 0002:0e:00.0 > /sys/bus/pci/drivers/vfio-pci/bind
-echo "Setup CPT device 0002:10.00.0"
-echo 64 > /sys/bus/pci/devices/0002:10:00.0/limits/cpt
-echo 0002:10:00.0 > /sys/bus/pci/drivers/octeontx2-cpt/unbind
-echo 0002:10:00.0 > /sys/bus/pci/drivers/octeontx2-cpt/bind
-echo 1 > /sys/bus/pci/drivers/octeontx2-cpt/0002:10:00.0/sso_pf_func_ovrd
-echo 24 > /sys/bus/pci/drivers/octeontx2-cpt/0002:10:00.0/sriov_numvfs
-echo "Setup CPT device 0002:10.00.1"
-echo '177d a0fe' > /sys/bus/pci/drivers/vfio-pci/new_id
-echo '0002:10:00.1' > /sys/bus/pci/drivers/octeontx2-cptvf/unbind
-echo 0002:10:00.1 > /sys/bus/pci/drivers/vfio-pci/bind
-#NPA PF
-echo "NPA PF"
-echo "177d a0fb" >  /sys/bus/pci/drivers/vfio-pci/new_id
-echo "Setup NPA device"
-echo 1 > /sys/bus/pci/devices/0002:0e:00.0/limits/npa
 
+# to do - crypto device --
+echo #--  inform vfio_pci about crypto devices  --" 
+     echo '177d a0fd' > /sys/bus/pci/drivers/vfio-pci/new_id
+
+
+
+
+
+echo "not here"     
+     MARVELL_PCI_DEVS=`lspci -d177d:`
+     echo "Reset RVU devices limits"
+     for dev in $(echo "$MARVELL_PCI_DEVS" | grep 'f9\|fb\|fd' | cut -d ' ' -f 1); do
+     echo $dev
+     echo 0 > /sys/bus/pci/devices/$dev/limits/cpt
+     echo 0 > /sys/bus/pci/devices/$dev/limits/sso
+     echo 0 > /sys/bus/pci/devices/$dev/limits/ssow
+     done
+     echo "Setup NET devices"
+     net_list="0002:02:00.0 0002:06:00.0"
+     echo '177d a063' > /sys/bus/pci/drivers/vfio-pci/new_id
+     for dev in $(echo "$MARVELL_PCI_DEVS" | grep "63" | cut -d ' ' -f 1); do
+         echo $dev
+         for item in $net_list; do
+             if [ $dev == $item ]; then
+                 echo $dev > /sys/bus/pci/drivers/octeontx2-nicpf/unbind
+                 echo $dev > /sys/bus/pci/drivers/vfio-pci/bind
+                 echo "...done"
+             fi
+         done
+     done
+     echo "Setup SSO device 0002:0e:00.0"
+     echo '177d a0f9' > /sys/bus/pci/drivers/vfio-pci/new_id
+     echo 24 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
+     echo 48 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+     echo 0002:0e:00.0 > /sys/bus/pci/devices/0002\:0e\:00.0/driver/unbind
+     echo 0002:0e:00.0 > /sys/bus/pci/drivers/vfio-pci/bind
+     echo "Setup CPT device 0002:10.00.0"
+     echo 64 > /sys/bus/pci/devices/0002:10:00.0/limits/cpt
+     echo 0002:10:00.0 > /sys/bus/pci/drivers/octeontx2-cpt/unbind
+     echo 0002:10:00.0 > /sys/bus/pci/drivers/octeontx2-cpt/bind
+     echo 1 > /sys/bus/pci/drivers/octeontx2-cpt/0002:10:00.0/sso_pf_func_ovrd
+     echo 24 > /sys/bus/pci/drivers/octeontx2-cpt/0002:10:00.0/sriov_numvfs
+     echo "Setup CPT device 0002:10.00.1"
+     echo '177d a0fe' > /sys/bus/pci/drivers/vfio-pci/new_id
+     echo '0002:10:00.1' > /sys/bus/pci/drivers/octeontx2-cptvf/unbind
+     echo 0002:10:00.1 > /sys/bus/pci/drivers/vfio-pci/bind
+     #NPA PF
+     echo "NPA PF"
+     echo "177d a0fb" >  /sys/bus/pci/drivers/vfio-pci/new_id
+     echo "Setup NPA device"
+     echo 1 > /sys/bus/pci/devices/0002:0e:00.0/limits/npa
+    
 fi
+
+
+echo "START HERE"
 
 # set all SSO device limits to 0
 echo 0 > /sys/bus/pci/devices/0002:0a:00.0/limits/sso
