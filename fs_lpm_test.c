@@ -49,7 +49,7 @@
 #include <rte_errno.h>
 #include "fs_lpm_test.h"
 
-#include "main.h"
+#include "fs_extras.h"
 
 static struct ipv4_fs_lpm_route RouteArray[] = {
          {RTE_IPV4(198, 18,  0, 0), 24,  10},  /* HF */

@@ -151,11 +151,12 @@ uint8_t                       nb_event_dev_devices = 0;
 struct  rte_event_dev_info    dev_info;
 struct  rte_event_dev_config  event_dev_config = {0};
 
-
 uint8_t                       event_q_id = 0;
 struct  rte_event_queue_conf  def_q_conf;        // queue
 struct  rte_event_queue_conf  event_q_conf; 
 uint32_t event_queue_cfg = 0;
+
+    WAI();
 
 //uint8_t                       event_p_id = 0;
 //struct  rte_event_port_conf
@@ -167,7 +168,6 @@ uint32_t event_queue_cfg = 0;
 //     int32_t x = -1 ;
 //     if (arg != NULL ) x = *(int32_t *)arg;
 //     printf("spinlock_setup function %d\n",x);
-
 
    {
 //////////
@@ -182,6 +182,7 @@ uint32_t event_queue_cfg = 0;
             printf(" did you forget to bind at least 1 to vfio-pci\n");
             rte_exit(EXIT_FAILURE, "No Event Devices available");   
         }
+        WAI();
         printf(" found %d event devices \n", nb_event_dev_devices);
  
 //  debug -print out all event dev devices
@@ -198,7 +199,6 @@ uint32_t event_queue_cfg = 0;
         }
         // WHY at least there is at least 1  device,  Index=0;
         g_evt_dev_id = 0;     // assign dev_id  to 0
-
 
         g_nb_PortsPerCore = 1   ; 
         g_nb_QueuesPerCore = 1  ; // should this be queues per port?  Should this be = number of cores??
@@ -218,22 +218,8 @@ uint32_t event_queue_cfg = 0;
         result = rte_event_dev_info_get( g_evt_dev_id, &dev_info );
         printf(" result    %d \n",result);
         printf(" default: dev_info \n");
-        printf("      struct rte_event_dev_info: \n");
-        printf("          char *        driver_name  %s \n",dev_info.driver_name);
-        printf("          rte_device * dev          %p \n",dev_info.dev);
-        printf("          uint32_t     min_dequeue_timeout_ns           0x%08x \n",dev_info.min_dequeue_timeout_ns         );  //uint32_t 	
-        printf("          uint32_t     max_dequeue_timeout_ns           0x%08x \n",dev_info.max_dequeue_timeout_ns         );  //uint32_t 	
-        printf("          uint32_t     dequeue_timeout_ns               0x%08x \n",dev_info.dequeue_timeout_ns             );  //uint32_t 	
-        printf("          uint8_t      max_event_queues                 0x%02x \n",dev_info.max_event_queues               );  //uint8_t 	
-        printf("          uint32_t     max_event_queue_flows            0x%08x \n",dev_info.max_event_queue_flows          );  //uint32_t 	
-        printf("          uint8_t      max_event_queue_priority_levels  0x%02x \n",dev_info.max_event_queue_priority_levels);  //uint8_t 	
-        printf("          uint8_t      max_event_priority_levels        0x%02x \n",dev_info.max_event_priority_levels      );  //uint8_t 	
-        printf("          uint8_t      max_event_ports                  0x%02x \n",dev_info.max_event_ports                );  //uint8_t 	
-        printf("          uint8_t      max_event_port_dequeue_depth     0x%02x \n",dev_info.max_event_port_dequeue_depth   );  //uint8_t 	
-        printf("          uint32_t     max_event_port_enqueue_depth     0x%08x \n",dev_info.max_event_port_enqueue_depth   );  //uint32_t 	
-        printf("          int32_t      max_num_events                   0x%08x \n",dev_info.max_num_events                 );  //int32_t 	
-        printf("          uint32_t     event_dev_cap                    0x%08x \n",dev_info.event_dev_cap                  );  //uint32_t 	
-    
+        print_rte_event_dev_info(0,"dev_info", &dev_info );   
+ 
    // check compatability - make sure queue will accept any type of RTE_SCHED_TYPE_* values: 
    //                                 ordered,parallel,atomic,ethdev,ccryptodev,timer,...
         if (dev_info.event_dev_cap & RTE_EVENT_DEV_CAP_QUEUE_ALL_TYPES)
@@ -253,12 +239,13 @@ uint32_t event_queue_cfg = 0;
 
 
 #ifdef PRINT_CALL_ARGUMENTS
-        FONT_CYAN();
+        FONT_CALL_ARGUMENTS_COLOR();
         printf(  " Call Args: g_evt_dev_id  %d  event_dev_config: \n",g_evt_dev_id );
         FONT_NORMAL();
 #endif
         print_rte_event_dev_config( 0, "config values for event_dev_config",0,&event_dev_config);   
-        printf(" %scall rte_event_dev_configure() %s\n",C_GREEN,C_NORMAL); 
+
+        CALL_RTE("rte_event_dev_configure()");
         result = rte_event_dev_configure(g_evt_dev_id, &event_dev_config);
         if(result < 0)
         {
@@ -489,20 +476,6 @@ uint32_t event_queue_cfg = 0;
      return 0;
 }
 
-void print_struct_rte_event( const char * string,struct rte_event *p);
-void print_struct_rte_event( const char * string,struct rte_event *p)
-{
-        printf("  %s        add:%p  \n"   , string  ,p        );
-        printf("     flow_id        %d \n", p->flow_id        );
-        printf("     sub_event_type %d \n", p->sub_event_type );
-        printf("     event_type     %d \n", p->event_type     );
-        printf("     op             %d \n", p->op             );
-        printf("     sched_type     %d \n", p->sched_type     );
-        printf("     queue_id       %d \n", p->queue_id       );
-        printf("     priority       %d \n", p->priority       );
-        printf("     event_ptr      %p \n", p->event_ptr       );
-}
-
 
 #define LOCK_LOOPS (10*10)
 #define BATCH_SIZE  4
@@ -557,7 +530,7 @@ int core_loop( __attribute__((unused)) void * arg)
         ev.priority       = RTE_EVENT_DEV_PRIORITY_NORMAL ; // uint8_t  priority;
         //ev.impl_opaque    =  ; // uint8_t  impl_opaque;
 
-        print_struct_rte_event( "ev",&ev);
+        print_rte_event( 1,"ev",&ev);
 
         ret = rte_event_enqueue_burst(dev_id, lcore_id,&ev, 1 );
         if( ret != 1 )
@@ -587,7 +560,7 @@ int core_loop( __attribute__((unused)) void * arg)
             continue;
         }
         printf("****    c%d) Received %d events **** \n",lcore_id,nb_rx);
-        print_struct_rte_event( "event[0]",&events[0]);
+        print_rte_event(1, "event[0]",&events[0]);
         printf(" Message:   %s\n",(char *)events[0].event_ptr);
 
         printf("  c%d) Send message to next Port (aka core for me)  %d events\n",lcore_id,next_core[lcore_id]);

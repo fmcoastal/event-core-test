@@ -23,6 +23,7 @@ void print_rte_eth_vmdq_dcb_conf (int indent, struct rte_eth_vmdq_dcb_conf *d);
 void print_rte_eth_rxmode( int indent, struct rte_eth_rxmode *d)
 {
    INDENT(indent);
+   FONT_DATA_STRUCTURES_COLOR();
 
    printf("%s struct rte_eth_rxmode { \n",s);
    printf("%s    mq_mode:          0x%02x\n",s,d->mq_mode);
@@ -35,11 +36,13 @@ void print_rte_eth_rxmode( int indent, struct rte_eth_rxmode *d)
    printf("%s    reserved_ptrs[0]        %p\n",s,d->reserved_ptrs[0]);
    printf("%s    reserved_ptrs[1]        %p\n",s,d->reserved_ptrs[1]);
    printf("%s } \n",s);
+   FONT_NORMAL();
 }
 
 void print_rte_eth_txmode( int indent, struct rte_eth_txmode *d)
 {
    INDENT(indent);
+   FONT_DATA_STRUCTURES_COLOR();
 
    printf("%s struct rte_eth_txmode { \n",s);
    printf("%s    mq_mode:          0x%02x\n",s,d->mq_mode);
@@ -53,11 +56,13 @@ void print_rte_eth_txmode( int indent, struct rte_eth_txmode *d)
    printf("%s    reserved_ptrs[0]        %p\n",s,d->reserved_ptrs[0]);
    printf("%s    reserved_ptrs[1]        %p\n",s,d->reserved_ptrs[1]);
    printf("%s } \n",s);
+   FONT_NORMAL();
 }
 
 void print_rte_eth_dcb_rx_conf(int indent, struct rte_eth_dcb_rx_conf  *d)
 {
    INDENT(indent);
+   FONT_DATA_STRUCTURES_COLOR();
 
    printf("%s struct rte_eth_dcb_rx_conf { \n"              ,s);
    printf("%s    inb_tcs:                       %d\n"   ,s,d->nb_tcs);
@@ -72,11 +77,13 @@ void print_rte_eth_dcb_rx_conf(int indent, struct rte_eth_dcb_rx_conf  *d)
       printf("\n");
    }
    printf("%s } \n",s);
+   FONT_NORMAL();
 }
 
 void print_rte_eth_rss_conf( int indent, struct rte_eth_rss_conf *d)
 {
    INDENT(indent);
+   FONT_DATA_STRUCTURES_COLOR();
 
    printf("%s struct rte_eth_rss_conf { \n"              ,s);
    printf("%s    rss_key:           %p\n"   ,s,d->rss_key);
@@ -93,11 +100,13 @@ void print_rte_eth_rss_conf( int indent, struct rte_eth_rss_conf *d)
    printf("%s    rss_key_len:       0x%02x\n"   ,s,d->rss_key_len);
    printf("%s    rss_hf:            0x%016lx\n"   ,s,d->rss_hf);
    printf("%s } \n",s);
+   FONT_NORMAL();
 }
 
 void print_rte_eth_vmdq_rx_conf(int indent, struct rte_eth_vmdq_rx_conf  *d)
 {
    INDENT(indent);
+   FONT_DATA_STRUCTURES_COLOR();
 
    printf("%s struct rte_eth_vmdq_rx_conf { \n"              ,s);
    printf("%s    nb_queue_pools:        %d\n"   ,s,d->nb_queue_pools);
@@ -110,11 +119,13 @@ void print_rte_eth_vmdq_rx_conf(int indent, struct rte_eth_vmdq_rx_conf  *d)
    printf("%s       pool_map[0].vlan_id          0x%04x\n"   ,s,d->pool_map[0].vlan_id);
    printf("%s       pool_map[0].pools            0x%016lx\n"  ,s,d->pool_map[0].pools);
    printf("%s } \n",s);
+   FONT_NORMAL();
 }
 
 void print_rte_eth_vmdq_dcb_conf (int indent, struct rte_eth_vmdq_dcb_conf *d)
 {
    INDENT(indent);
+   FONT_DATA_STRUCTURES_COLOR();
 
    printf("%s struct rte_eth_vmdq_dcb_conf { \n"              ,s);
    printf("%s    nb_queue_pools:           %d\n"   ,s,d->nb_queue_pools);
@@ -127,31 +138,34 @@ void print_rte_eth_vmdq_dcb_conf (int indent, struct rte_eth_vmdq_dcb_conf *d)
    printf("%s    dcb_tc  array size        0x%02x\n"   ,s,ETH_DCB_NUM_USER_PRIORITIES);
    printf("%s        dcb_tc[0]:                0x%02x\n"   ,s,d->dcb_tc[0]);
    printf("%s } \n",s);
+   FONT_NORMAL();
 }
 
 
 #if 1
- void print_rte_eth_conf  (int indent,const char* string,int id,struct rte_eth_conf *p)
- {
-     INDENT(indent);
-     printf("%sstruct rte_eth_conf %s eth#=%d {\n",s,string,id);
-     printf("%s    uint32_t     link_speeds    :  %d\n"   ,s,p->link_speeds  );
-     print_rte_eth_rxmode( indent+1 , &(p->rxmode));
-     print_rte_eth_txmode( indent+1 , &(p->txmode));
-     printf("%s    uint32_t     lpbk_mode      :  %d\n"   ,s,p->lpbk_mode    );
-     printf("%s    struct rx_adv_conf             -below\n",s   );
-     print_rte_eth_rss_conf     ( indent+2 , &(p->rx_adv_conf.rss_conf      ));
-     print_rte_eth_vmdq_dcb_conf( indent+2 , &(p->rx_adv_conf.vmdq_dcb_conf ));
-     print_rte_eth_dcb_rx_conf  ( indent+2 , &(p->rx_adv_conf.dcb_rx_conf   ));
-     print_rte_eth_vmdq_rx_conf ( indent+2 , &(p->rx_adv_conf.vmdq_rx_conf  ));
+void print_rte_eth_conf  (int indent,const char* string,int id,struct rte_eth_conf *p)
+{
+   INDENT(indent);
+   FONT_DATA_STRUCTURES_COLOR();
 
+   printf("%sstruct rte_eth_conf %s eth#=%d {\n",s,string,id);
+   printf("%s    uint32_t     link_speeds    :  %d\n"   ,s,p->link_speeds  );
+   print_rte_eth_rxmode( indent+1 , &(p->rxmode));
+   print_rte_eth_txmode( indent+1 , &(p->txmode));
+   printf("%s    uint32_t     lpbk_mode      :  %d\n"   ,s,p->lpbk_mode    );
+   printf("%s    struct rx_adv_conf             -below\n",s   );
+   print_rte_eth_rss_conf     ( indent+2 , &(p->rx_adv_conf.rss_conf      ));
+   print_rte_eth_vmdq_dcb_conf( indent+2 , &(p->rx_adv_conf.vmdq_dcb_conf ));
+   print_rte_eth_dcb_rx_conf  ( indent+2 , &(p->rx_adv_conf.dcb_rx_conf   ));
+   print_rte_eth_vmdq_rx_conf ( indent+2 , &(p->rx_adv_conf.vmdq_rx_conf  ));
 
-     printf("%s    struct tx_adv_conf             -TBD-\n",s   );
-     printf("%s    uint32_t dcb_capability_en:    %d\n"   ,s,p->dcb_capability_en   );
-     printf("%s    struct fdir_conf:              -TBD-\n",s   );
-     printf("%s    struct intr_conf:              -TBD-\n",s   );
+   printf("%s    struct tx_adv_conf             -TBD-\n",s   );
+   printf("%s    uint32_t dcb_capability_en:    %d\n"   ,s,p->dcb_capability_en   );
+   printf("%s    struct fdir_conf:              -TBD-\n",s   );
+   printf("%s    struct intr_conf:              -TBD-\n",s   );
 
-     printf("%s}\n",s);
+   printf("%s}\n",s);
+   FONT_NORMAL();
 /*
 uint32_t        link_speeds
 struct rte_eth_rxmode   rxmode

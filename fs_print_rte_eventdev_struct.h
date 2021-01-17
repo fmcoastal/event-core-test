@@ -8,12 +8,12 @@
 
 #ifdef PRINT_DATA_STRUCTURES
 
-void  print_rte_event(int indent,struct rte_event *p);
+void  print_rte_event(int indent,const char * string,struct rte_event *p);
 void  print_rte_event_dev_config(int,const char*,int,struct rte_event_dev_config*);
 void  print_rte_event_queue_conf(int,const char*,int,struct rte_event_queue_conf*);
 void  print_rte_event_port_conf(int,const char*,int,struct rte_event_port_conf*);
 void  print_rte_event_eth_rx_adapter_queue_conf(int,const char*,int,struct rte_event_eth_rx_adapter_queue_conf*);
-void  print_rte_event_dev_info(struct rte_event_dev_info * p);
+void  print_rte_event_dev_info(int indent,const char* string, struct rte_event_dev_info * p);
 
 #else
 

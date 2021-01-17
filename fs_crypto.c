@@ -207,7 +207,7 @@ uint32_t caps;
 
    if (result != 0)  printf( " rte_event_dev_info_get() failed: %d\n",result);
 
-   print_rte_event_dev_info(&dev_info);
+   print_rte_event_dev_info(0,"dev_info ",&dev_info);
 
    conf.new_event_threshold = dev_info.max_num_events;
    conf.dequeue_depth = dev_info.max_event_port_dequeue_depth;
@@ -609,21 +609,6 @@ uint32_t event_queue_cfg = 0;
 }
 
 
-extern void print_struct_rte_event( const char * string,struct rte_event *p);
-#if 0
-void print_struct_rte_event( const char * string,struct rte_event *p)
-{
-        printf("  %s        add:%p  \n"   , string  ,p        );
-        printf("     flow_id        %d \n", p->flow_id        );
-        printf("     sub_event_type %d \n", p->sub_event_type );
-        printf("     event_type     %d \n", p->event_type     );
-        printf("     op             %d \n", p->op             );
-        printf("     sched_type     %d \n", p->sched_type     );
-        printf("     queue_id       %d \n", p->queue_id       );
-        printf("     priority       %d \n", p->priority       );
-        printf("     event_ptr      %p \n", p->event_ptr       );
-}
-#endif
 
 #define LOCK_LOOPS (10*10)
 #define BATCH_SIZE  4
@@ -672,7 +657,7 @@ int crypto_loop( __attribute__((unused)) void * arg)
         ev.priority       = RTE_EVENT_DEV_PRIORITY_NORMAL ; // uint8_t  priority;
         //ev.impl_opaque    =  ; // uint8_t  impl_opaque;
 
-        print_struct_rte_event( "ev",&ev);
+        print_rte_event( 1, "ev",&ev);
 
         ret = rte_event_enqueue_burst(dev_id, lcore_id,&ev, 1 );
         if( ret != 1 )
@@ -702,7 +687,7 @@ int crypto_loop( __attribute__((unused)) void * arg)
             continue;
         }
         printf("****    c%d) Received %d events **** \n",lcore_id,nb_rx);
-        print_struct_rte_event( "event[0]",&events[0]);
+        print_rte_event(1, "event[0]",&events[0]);
         printf(" Message:   %s\n",(char *)events[0].event_ptr);
 
         printf("  c%d) Send cpt_message to next Port (aka core for me)  %d events\n",lcore_id,next_core[lcore_id]);
