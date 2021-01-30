@@ -53,6 +53,9 @@
 
 // GLOBAL DEFINITIONS REFERENCED BY TEST FUNCTIONS
 
+
+uint64_t      g_core_messages=0;      // only valid in eth -> event dev forward 
+                                      // enables inter core messages
 uint64_t      g_verbose = 0;          // Higher number more printouts 
 volatile bool g_force_quit;           // Ctrl-C flag
 rte_spinlock_t g_fs_print_lock = {0}; //  lock for printing to output if 
@@ -132,6 +135,7 @@ void usage(void)
     printf("\n"); 
     printf("  -c <coremash>\n");  
     printf("  -T <option>  \n\n");
+    printf("  -m if event ethdev, include inter-core messages  \n\n");
     printf("  %d",1);   tm_spinlock.description();
     printf("  %d",2);   tm_rwspinlock.description();
     printf("  %d",3);   tm_rte_lcore_id.description();
@@ -276,6 +280,7 @@ main(int argc, char **argv)
  */
 static const char short_options[] =
 	"h"   /* help */
+	"m"   /* add inter core messages */
 	"p:"  /* portmask */
 	"q:"  /* number of queues */
 	"t:"  /* test number */
@@ -325,6 +330,11 @@ myapp_parse_args(int argc, char **argv)
 		/* help */
 		case 'h':
                         usage();
+			break;
+
+		/* Send  messages between coress. */
+		case 'm':
+                        g_core_messages = 1;
 			break;
 
 		/* test code to run */

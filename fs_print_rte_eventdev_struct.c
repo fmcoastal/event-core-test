@@ -112,11 +112,11 @@ void print_rte_event_queue_conf(int indent,const char* string,int id, struct rte
   INDENT(indent);
   FONT_DATA_STRUCTURES_COLOR();
   printf("%sstruct rte_event_queue_conf %s queue#=%d\n",s,string,id);
-  printf("%s    uint32_t nb_atomic_flows:  %d\n",s,p->nb_atomic_flows);
-  printf("%s    uint32_t nb_atomic_order_sequences:  %d\n",s,p->nb_atomic_order_sequences);
-  printf("%s    uint32_t event_queue_cfg:  %d -%s\n",s,p->event_queue_cfg,event_queue_cfg_string[p->event_queue_cfg]);
-  printf("%s    uint8_t  schedule_type:    %d\n",s,p->schedule_type);
-  printf("%s    uint8_t  priority:         %d\n",s,p->priority);
+  printf("%s    uint32_t nb_atomic_flows:            %d  (0x%08x)\n",s,p->nb_atomic_flows, p->nb_atomic_flows );
+  printf("%s    uint32_t nb_atomic_order_sequences:  %d  (0x%08x)\n",s,p->nb_atomic_order_sequences,p->nb_atomic_order_sequences );
+  printf("%s    uint32_t event_queue_cfg:            %d -%s\n",s,p->event_queue_cfg,event_queue_cfg_string[p->event_queue_cfg]);
+  printf("%s    uint8_t  schedule_type:              %d  (0x%08x)\n",s,p->schedule_type, p->schedule_type);
+  printf("%s    uint8_t  priority:                   %d  (0x%08x)\n",s,p->priority, p->priority);
   FONT_NORMAL();
 }
 #endif

@@ -2,7 +2,7 @@
 
 echo "177d a0f9" >  /sys/bus/pci/drivers/vfio-pci/new_id
 
-dpdk-devbind -s | grep a0f9
+dpdk-devbind.py -s | grep a0f9
 
 
 echo 0 > /sys/bus/pci/devices/0002:07:00.0/limits/sso

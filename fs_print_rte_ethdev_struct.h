@@ -22,6 +22,10 @@ void print_rte_eth_rss_conf( int indent, struct rte_eth_rss_conf *d);
 void print_rte_eth_vmdq_rx_conf(int indent, struct rte_eth_vmdq_rx_conf  *d);
 void print_rte_eth_vmdq_dcb_conf (int indent, struct rte_eth_vmdq_dcb_conf *d);
 
+void print_rte_eth_rxconf( int indent, struct rte_eth_rxconf *d);
+void print_rte_eth_txconf( int indent, struct rte_eth_txconf *d);
+
+
 #else
 
 #define print_rte_eth_conf( w,x,y,z);

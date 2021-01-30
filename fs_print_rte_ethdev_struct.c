@@ -142,6 +142,50 @@ void print_rte_eth_vmdq_dcb_conf (int indent, struct rte_eth_vmdq_dcb_conf *d)
 }
 
 
+void print_rte_eth_thresh(int indent, struct rte_eth_thresh *d);
+void print_rte_eth_thresh(int indent, struct rte_eth_thresh *d)
+{
+   INDENT(indent);
+
+   printf("%s struct rte_eth_thresh { \n",s);
+   printf("%s    pthresh: 0x%02x\n",s,d->pthresh);
+   printf("%s    hthresh: 0x%02x\n",s,d->hthresh);
+   printf("%s    wthresh: 0x%02x\n",s,d->wthresh);
+   printf("%s } \n",s);
+}
+
+
+
+
+void print_rte_eth_rxconf( int indent, struct rte_eth_rxconf *d)
+{
+   INDENT(indent);
+
+   printf("%s struct rte_eth_rxconf { \n"              ,s);
+   print_rte_eth_thresh(indent+1,&(d->rx_thresh));
+   printf("%s    rx_free_thresh:    0x%04x \n"   ,s,d->rx_free_thresh);
+   printf("%s    rx_drop_en:        0x%02x \n"  ,s,d->rx_drop_en);
+   printf("%s    rx_deferred_start: 0x%02x \n"  ,s,d->rx_deferred_start);
+   printf("%s    offloads:          0x%016lx \n",s,d->offloads);
+   printf("%s } \n",s);
+}
+
+void print_rte_eth_txconf( int indent, struct rte_eth_txconf *d)
+{
+   INDENT(indent);
+
+   printf("%s struct rte_eth_txconf { \n"              ,s);
+   print_rte_eth_thresh(indent+1, &(d->tx_thresh));
+   printf("%s    tx_rs_thresh:      0x%04x\n"   ,s,d->tx_rs_thresh);
+   printf("%s    tx_free_thresh:    0x%02x \n"  ,s,d->tx_free_thresh);
+   printf("%s    tx_deferred_start: 0x%02x \n"  ,s,d->tx_deferred_start);
+   printf("%s    offloads:          0x%016lx \n",s,d->offloads);
+   printf("%s } \n",s);
+}
+ 
+
+
+
 #if 1
 void print_rte_eth_conf  (int indent,const char* string,int id,struct rte_eth_conf *p)
 {
