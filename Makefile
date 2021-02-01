@@ -11,8 +11,13 @@ SRCS-y += fs_spinlock_test.c
 SRCS-y += fs_core.c
 SRCS-y += fs_crypto.c
 SRCS-y += fs_ethdev.c
-SRCS-y += fs_print_rte_eventdev_struct.c
+SRCS-y += fs_eventdev.c
 SRCS-y += fs_print_rte_ethdev_struct.c
+SRCS-y += fprintbuff.c
+SRCS-y += fs_print_rte_mbuff.c
+SRCS-y += fs_eventdev_timer.c
+SRCS-y += fs_global_vars.c
+
 
 # Build using pkg-config variables if possible
 ifeq ($(shell pkg-config --exists libdpdk && echo 0),0)
