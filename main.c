@@ -54,7 +54,8 @@
 // GLOBAL DEFINITIONS REFERENCED BY TEST FUNCTIONS
 
 
-uint64_t      g_core_messages=0;      // only valid in eth -> event dev forward 
+uint64_t      g_core_messages =0;      // only valid in eth -> event dev forward 
+int64_t       g_print_interval=0;      // only valid in eth -> event dev forward 
                                       // enables inter core messages
 uint64_t      g_verbose = 0;          // Higher number more printouts 
 volatile bool g_force_quit;           // Ctrl-C flag
@@ -136,6 +137,7 @@ void usage(void)
     printf("  -c <coremash>\n");  
     printf("  -T <option>  \n\n");
     printf("  -m if event ethdev, include inter-core messages  \n\n");
+    printf("  -p <count> if event ethdev, interval to print packets  \n\n");
     printf("  %d",1);   tm_spinlock.description();
     printf("  %d",2);   tm_rwspinlock.description();
     printf("  %d",3);   tm_rte_lcore_id.description();
@@ -281,7 +283,7 @@ main(int argc, char **argv)
 static const char short_options[] =
 	"h"   /* help */
 	"m"   /* add inter core messages */
-	"p:"  /* portmask */
+	"p:"  /* print interval */
 	"q:"  /* number of queues */
 	"t:"  /* test number */
 	"v:"  /* verbose output */
@@ -319,10 +321,6 @@ myapp_parse_args(int argc, char **argv)
 				  lgopts, &option_index)) != EOF) {
 
 		switch (opt) {
-		/* portmask */
-		case 'p':
-			break;
-
 		/* nqueue */
 		case 'q':
 			break;
@@ -336,6 +334,14 @@ myapp_parse_args(int argc, char **argv)
 		case 'm':
                         g_core_messages = 1;
 			break;
+
+		/*  Set Print Interval */
+		case 'p':
+                        printf(" print_interval = %s \n",optarg);
+                        g_print_interval = atoi(optarg);
+			break;
+
+
 
 		/* test code to run */
 		case 't':

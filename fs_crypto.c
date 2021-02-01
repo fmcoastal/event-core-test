@@ -58,7 +58,7 @@
 #include "fs_extras.h"
 #include "fs_spinlock_test.h"
 
-#include "fs_print_rte_eventdev_struct.h"
+#include "fs_eventdev.h"
 
 
 #if 0

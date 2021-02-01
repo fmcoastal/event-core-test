@@ -66,8 +66,7 @@ static const struct rss_type_info rss_type_table[] = {
 /*
  *   COnverts an IP address into a printable string
  */
-static inline char * format_ip_addr(char * str,uint32_t ip);
-static inline char * format_ip_addr(char * str,uint32_t ip)
+char * format_ip_addr(char * str,uint32_t ip)
 {
    sprintf(str,"%d.%d.%d.%d",((ip >> 24)&0xff),((ip >> 16)&0xff),((ip >> 8)&0xff),((ip >> 0)&0xff));
    return str;
@@ -75,19 +74,20 @@ static inline char * format_ip_addr(char * str,uint32_t ip)
 /*
  *   COnverts an LE_IP address into a printable string
  */
-static inline char * format_LE_ip_addr(char * str,uint32_t ip);
-static inline char * format_LE_ip_addr(char * str,uint32_t ip)
+char * format_LE_ip_addr(char * str,uint32_t ip)
 {
    sprintf(str,"%d.%d.%d.%d",((ip >> 0)&0xff),((ip >> 8)&0xff),((ip >> 16)&0xff),((ip >> 24)&0xff));
    return str;
 }
 
+
+char BAD_POINTER[]={"BAD POINTER"};
 /*
  *   converts a ethernet address into a printable String
  */
-static inline char * format_mac_addr(char * str,struct rte_ether_addr *m );
-static inline char * format_mac_addr(char * str,struct rte_ether_addr *m )
+char * format_mac_addr(char * str,struct rte_ether_addr *m )
 {
+   if ( str == NULL) return BAD_POINTER;
    sprintf(str,"%02x:%02x:%02x:%02x:%02x:%02x",m->addr_bytes[0]
                                               ,m->addr_bytes[1]
                                               ,m->addr_bytes[2]

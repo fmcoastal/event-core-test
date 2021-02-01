@@ -4,6 +4,24 @@
 
 
 /*
+ *   COnverts an IP address into a printable string
+ */
+char * format_ip_addr(char * str,uint32_t ip);
+/*
+ *   COnverts an LE_IP address into a printable string
+ */
+char * format_LE_ip_addr(char * str,uint32_t ip);
+
+/*
+ *   converts a ethernet address into a printable String
+ */
+char * format_mac_addr(char * str,struct rte_ether_addr *m );
+
+
+
+
+
+/*
 #define INDENT_SIZE 3
 #define INDENT(x) \
     char s[64]= {0};\
