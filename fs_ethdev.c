@@ -70,8 +70,8 @@
 extern uint64_t  g_core_messages;
 extern int64_t g_print_interval;
 
-void print_setup(void);
-void print_setup(void)
+void print_eth_setup(void);
+void print_eth_setup(void)
 {
 printf("\n"
 "  ---------------          ------------                                     \n"
@@ -892,6 +892,23 @@ uint32_t event_queue_cfg = 0;
         }
     }
 
+
+{
+        uint32_t  queue_count = 0xffffffff; 
+        uint32_t  port_count = 0xffffffff; 
+
+        rte_event_dev_attr_get(g_glob.event_d_id, RTE_EVENT_DEV_ATTR_PORT_COUNT,&port_count);
+        rte_event_dev_attr_get(g_glob.event_d_id, RTE_EVENT_DEV_ATTR_QUEUE_COUNT,&queue_count);
+       
+        printf(" eventdev  Sanity Check for eventdev id: %d\n", g_glob.event_d_id);
+        printf("                  number of event ports: %u\n", port_count);
+        printf("                 number of event queues: %u\n", queue_count);
+  
+}     
+
+
+
+
 //////
 //////
 //////   // not sure about this...
@@ -959,7 +976,6 @@ void  rx_tx_adapter_setup_internal_port(void)
     int      ret;
 WAI();
 
- print_global_data(&g_glob);
  
      memset(&eth_q_conf, 0, sizeof(eth_q_conf));
     eth_q_conf.ev.priority = RTE_EVENT_DEV_PRIORITY_NORMAL;
@@ -1072,7 +1088,7 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 {
 
     WAI();
-   print_setup(); 
+   print_eth_setup(); 
 
 
     g_glob.enabled_port_mask = 0x03 ;                // cmd line -p argument - here I hardwired :-0    
@@ -1281,6 +1297,14 @@ int ethdev_setup( __attribute__((unused)) void * arg)
  
     Initialize_EventDev();
 
+/////
+/////
+/////  Start event_dev subsystem 
+/////
+/////
+
+    start_event_dev();
+
 /////////////////////  
 /////////////////////  
 /////////////////////  
@@ -1290,16 +1314,15 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 //    associate adapter to eth queue and event queue
 //    create tx_adapters    
 //    associate adapter to eth queue and event queue
+//
+//  per dpdk docs (40.1.5. Starting the Adapter Instance)
+//      event dev should be started before starting adapterss
+
  
-    rx_tx_adapter_setup_internal_port();;
+    print_global_data(&g_glob);
 
-/////
-/////
-/////  Start event_dev subsystem 
-/////
-/////
+//    rx_tx_adapter_setup_internal_port();;
 
-    start_event_dev();
 
 /////
 /////
@@ -1370,68 +1393,82 @@ char * ethdev_message[] = {ethdev_m0,ethdev_m1,ethdev_m2,ethdev_m3};
 int g_message_counter = 0;
 int g_drop_all_traffic = 0;
 
-struct rte_event       g_ev;          // use this to encode an event.
-struct rte_event_timer g_ev_timer;    // use this to encode a timer event.
+struct rte_event         g_ev        __rte_cache_aligned;          // use this to encode an event.
+struct rte_event_timer   g_ev_timer  __rte_cache_aligned;    // use this to encode a timer event.
+
 
 int ethdev_loop( __attribute__((unused)) void * arg)
 {
     unsigned lcore_id;
-//    char string[256];
-//    int  i;
-//    size_t sent = 0, received = 0;
-
+    int  i;
+    // struct rte_event   ev;
     uint8_t event_dev_id ;
-    uint8_t port_id ;
+    uint8_t event_port_id ;
    
     struct rte_event events[BATCH_SIZE];
     uint16_t nb_rx; 
-    uint8_t  next_core[] = {1,2,3,0};  
+    // because my event device is 1 core to 1 port to 1 queue,  the table below is a
+    //     a simple bit ot
+    uint8_t  core_2_message[]           = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,1,2,3 };
+    uint8_t  core_2_next_message[]      = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 1,2,3,0 };
+    uint8_t  core_2_evt_port_id[]       = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,1,2,3 };
+    uint8_t  core_2_next_evt_port_id[]  = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 1,2,3,0 };
+    uint8_t  core_2_next_evt_queue_id[] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 3,5,7,1 };
     uint16_t ret;
-    int i;
-
     int core_counter = 0;
 
-    lcore_id   = rte_lcore_id();      // my core index
-    event_dev_id     = g_glob.event_d_id;   // id of my event device
-    port_id    = lcore_id;            // I have 1 port associated with 1 core.  
-                                      //   problem here could be lcore 19,20,21,22 
-                                      //           does not map port index 0,1,2,3 
-
-    if( (lcore_id == 0 )  && ( g_core_messages == 1))
+    if( ! ( rte_lcore_is_enabled(20)  &&
+            rte_lcore_is_enabled(21)  &&
+            rte_lcore_is_enabled(22)  &&
+            rte_lcore_is_enabled(23) ))
     {
+        printf(" this function expects you to use cores 20,21,22,24i (-c 0xf00000) ");
+        rte_panic(" use the correct cores, or fix the core_2_port/message/queue mappings");
+    }
+
+    lcore_id       = rte_lcore_id();             // my core index
+    event_dev_id   = g_glob.event_d_id;          // id of my event device
+    event_port_id  = core_2_evt_port_id[ lcore_id ]; // for now, I have 1 port associated with 1 core.  
+
+    if( (lcore_id == 20 )  && ( g_core_messages == 1))
+    {
+        
         // cmd line option to send inter-core operations
  
         printf("*** Put an event into the Event Dev Scheduler ***\n");
+        printf("***     first message should come back to this core ***\n");
+        // because of my event dev definition:  want to enqueue to ev_queue 1 and ev_port 0, priority 0x40
 
-        printf("        event_dev_id: %d \n ",event_dev_id);
-        printf("        port_id: %d \n ",port_id);
-        printf("        lcore_id: %d \n ",lcore_id);
-        printf("        print every : %ldth  \n ",g_print_interval);
+        printf("        event_dev_id:   %d \n",event_dev_id);
+        printf("        event_port_id:  %d \n",event_port_id);
+        printf("        lcore_id:       %d \n",lcore_id);
+        printf("        print every :   %ldth  \n",g_print_interval);
 
         memset(&g_ev,0, sizeof(struct rte_event)); 
         g_ev.event=0;    // set event "union" fields to 0
-        g_ev.event_ptr  = (void *) (ethdev_message[lcore_id]) ;  // set the second 64 bits to point at a payload
      
 // In order to get sso to deliver, I have to add the following to the WQE
-        g_ev.flow_id        = 0xDEAD;                 // uint32_t flow_id:20;
-        g_ev.sub_event_type = RTE_EVENT_TYPE_CPU ;    // uint32_t sub_event_type:8;
-        g_ev.event_type     = RTE_EVENT_TYPE_CPU ;    // uint32_t event_type:4;
-        g_ev.op             = RTE_EVENT_OP_NEW;         // uint8_t op:2; NEW,FORWARD or RELEASE
+        g_ev.flow_id        = 0xDEAD;                   // uint32_t flow_id:20;
+        g_ev.sub_event_type = RTE_EVENT_TYPE_CPU ;      // uint32_t sub_event_type:8;
+        g_ev.event_type     = RTE_EVENT_TYPE_CPU ;      // uint32_t event_type:4;
+        g_ev.op             = RTE_EVENT_OP_NEW;         // uint8_t op:2; NEW,FORWARD or RELEASE  Really Create a flow, reuse a flow, delete a few. 
         //g_ev.rsvd           =  ;                      // uint8_t rsvd:4;
-        g_ev.sched_type     = RTE_SCHED_TYPE_PARALLEL ;       // uint8_t  sched_type:2;
-        g_ev.queue_id       = 0 ;                             // uint8_t  queue_id;
-        g_ev.priority       = RTE_EVENT_DEV_PRIORITY_NORMAL ; // uint8_t  priority;
+        g_ev.sched_type     = RTE_SCHED_TYPE_PARALLEL ; // uint8_t  sched_type:2;
+        g_ev.queue_id       = 0x01;                     // uint8_t  queue_id;  (This is the eventdev queue for where the even is to be placed.)
+                                                                             // queue 1 is the high prioity queue for event dev port 0 / core 20  
+        g_ev.priority       = 0x40;                     // uint8_t  priority;  (priority assigned to event queue )
         //g_ev.impl_opaque    =  ; // uint8_t  impl_opaque;
+        g_ev.event_ptr  = (void *) (ethdev_message[core_2_message[ lcore_id ] ]) ;  // set the second 64 bits to point at a payload
      
      
 #ifdef PRINT_CALL_ARGUMENTS
         FONT_CALL_ARGUMENTS_COLOR();
-        printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,lcore_id);
+        printf(" Call Args: event_dev_id:%d, evt_port_id :%d ev: \n",event_dev_id,event_port_id);
         FONT_NORMAL();
 #endif
         print_rte_event( 1, "g_ev",&g_ev);
         CALL_RTE("rte_event_enqueue_burst() ");
-        ret = rte_event_enqueue_burst(event_dev_id, lcore_id  ,&g_ev, 1 );
+        ret = rte_event_enqueue_burst(event_dev_id, event_port_id ,&g_ev, 1 );
         if( ret != 1 )
         {
              printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
@@ -1468,12 +1505,12 @@ int ethdev_loop( __attribute__((unused)) void * arg)
 
 #ifdef PRINT_CALL_ARGUMENTS
         FONT_CALL_ARGUMENTS_COLOR();
-        printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,lcore_id);
+        printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,core_2_evt_port_id[lcore_id]);
         FONT_NORMAL();
 #endif
         print_rte_event( 1, "g_ev_timer.ev",&(g_ev_timer.ev));
         CALL_RTE("rte_event_enqueue_burst() ");
-        ret = rte_event_enqueue_burst(event_dev_id, lcore_id  ,&g_ev, 1 );
+        ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id]  ,&g_ev, 1 );
         if( ret != 1 )
         {
              printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
@@ -1487,13 +1524,13 @@ int ethdev_loop( __attribute__((unused)) void * arg)
 
 // struct worker_data *data = (struct worker_data *)arg;
 
-    printf(" Launch code on Core: %d\n",lcore_id);
+    printf(" Launch code on Core: %d event_port %d \n",lcore_id, event_port_id);
     while (!g_force_quit)
     {
        // lots of handwaving here.  there should be only one event 
        //    put in before the Event loop
  
-        nb_rx = rte_event_dequeue_burst(event_dev_id, port_id,
+        nb_rx = rte_event_dequeue_burst(event_dev_id, event_port_id,
                                 events, RTE_DIM(events), 0);
 
         if (nb_rx == 0) 
@@ -1506,27 +1543,26 @@ int ethdev_loop( __attribute__((unused)) void * arg)
             if( events[i].event_type == RTE_EVENT_TYPE_CPU )
             {     
  
-                 printf("****    c%d) Received %d events **** \n",lcore_id,nb_rx);
+                 printf("****    c%d) Received %d events from evt_port_id %d**** \n",lcore_id,nb_rx,event_port_id);
                  print_rte_event( 0, "event[i]",&events[i]);
                  printf(" Message:   %s\n",(char *)events[i].event_ptr);
                  
-                 printf("  c%d) Send message to next Port (aka core for me)  %d events\n",lcore_id,next_core[lcore_id]);
+                 printf("  c%d) Send message to next Port (aka core for me)  port_id: %d \n",lcore_id
+                                                         ,core_2_next_evt_port_id[lcore_id]);
                  
                  // set to forward to next core.
-                 events[i].queue_id       = next_core[lcore_id];
+                 events[i].queue_id       = core_2_next_evt_queue_id[lcore_id];
                  // set operation to forward packet    
-                 //  events[0].op             = RTE_EVENT_OP_FORWARD;
+                 // events[i].op             = RTE_EVENT_OP_FORWARD;  // this for some reason stops the event form forwarding
                  events[i].flow_id        += 1;
-                 events[i].event_ptr  = (void *)ethdev_message[lcore_id]; 
+                 events[i].priority        = 0x40 ; 
+                 events[i].event_ptr       = (void *)ethdev_message[core_2_next_message[lcore_id]] ; 
                  
+                 // print_rte_event( 0, "event[i]",&events[i]);
                  rte_pause();
                  usleep(500000);     
-                 
-                 
 
-
-
-                 ret = rte_event_enqueue_burst(event_dev_id, port_id,
+                 ret = rte_event_enqueue_burst(event_dev_id, core_2_next_evt_port_id[lcore_id],
                                      &(events[i]) , 1);
                  if( ret != 1 )
                  {
@@ -1535,7 +1571,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                       rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
                  }
             }
-            else
+            else   // evemt -> etherent packet 
             {
 //<FS>
                  core_counter--;
@@ -1548,7 +1584,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                      core_counter = g_print_interval;
                      p_mbuff = events[i].mbuf;
 
-                     printf("%d< got packet  Stream  flow_id: 0x%05x  queue_id: %d, port_id %d\n",lcore_id,events[i].flow_id,events[i].queue_id,port_id );
+                     printf("%d< got packet  Stream  flow_id: 0x%05x  queue_id: %d, port_id %d\n",lcore_id,events[i].flow_id,events[i].queue_id,event_port_id );
                      if(g_verbose > 3)
                      {
                          buf = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
@@ -1559,8 +1595,6 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                      print_rte_mbuf(0,p_mbuff);
                  }
 //<FS>
-
-
                  if ( g_drop_all_traffic  == 1)
                  {
                        
@@ -1568,13 +1602,11 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                  }
                  else
                  {
-
-
 #ifdef LOOP_CALLS
                      CALL_RTE("rte_event_eth_tx_adapter_enqueue()");
 #endif
                      while (!rte_event_eth_tx_adapter_enqueue(event_dev_id,
-                                                              port_id,
+                                                              event_port_id,   // here is where I map to other interface??
                                                     &(events[i]), 1, 0) &&
                                                    ( g_force_quit != true ) ) 
                                      ;

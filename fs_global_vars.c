@@ -61,18 +61,79 @@ void print_global_data (global_data_t *p)
 char eth_addr[30];
 int i,j;
    printf("%s",C_RED);
-   printf(" uint16_t  enabled_port_mask = %d \n",p->enabled_port_mask);
-   printf(" uint16_t  nb_ports_available = %d \n",p->nb_ports_available);
-   printf(" uint16_t  event_d_id = %d \n",p->event_d_id);
+   printf(" uint16_t  enabled_port_mask            = %d \n",p->enabled_port_mask);
+   printf(" uint16_t  nb_ports_available           = %d \n",p->nb_ports_available);
+   printf(" uint16_t  event_d_id                   = %d \n",p->event_d_id);
    printf(" struct    rte_mempool* p_pktmbuf_pool  = %p \n",p->p_pktmbuf_pool);
-   {
+
+
+
+    printf("------------ eventdev queues -----------\n");
+    printf(" struct event_queues  evq : {\n");
+    printf("         uint8_t nb_queues; %d \n",p->evq.nb_queues);
+    if (p->evq.nb_queues == 0 )
+    {
+         printf("           -- no evq array malloc-ed yet\n");
+    }
+    else
+    {
+       printf("       event_queue_cfg_t  arrayi\n");
+       printf("    queue    to_port  event_queue_cfg   schedule_type   priority\n");
+       for ( i = 0 ; i < p->evq.nb_queues ; i++)
+       {
+          printf("     %2d)      %2d         0x%08x           0x%02x         0x%02x \n",
+                     ((p->evq.event_q_cfg) + i)->event_q_id       ,
+                     ((p->evq.event_q_cfg) + i)->to_event_port    ,
+                     ((p->evq.event_q_cfg) + i)->ev_q_conf.event_queue_cfg ,
+                     ((p->evq.event_q_cfg) + i)->ev_q_conf.schedule_type ,
+                     ((p->evq.event_q_cfg) + i)->ev_q_conf.priority );
+       }
+       printf("\n");
+    }
+    printf("        }\n");
+
+
+    printf("------------ eventdev ports -----------\n");
+    printf(" struct event_ports  evp : {\n");
+    printf("         uint8_t nb_ports; %d \n",p->evp.nb_ports);
+    if (p->evp.nb_ports == 0 )
+    {
+         printf("           -- no evp array malloc-ed yet\n");
+    }
+    else
+    {
+       for ( i = 0 ; i < p->evp.nb_ports ; i++)
+       {
+          printf("           port# %d \n",i);
+          printf("              number of queues  %d \n", (g_glob.evp.event_p_id + i)->nb_links);
+          for ( j = 0 ; j < (g_glob.evp.event_p_id + i)->nb_links ; j++)
+          {
+               printf("                %d) queue_id %d  queue_prioity %d\n",j
+                                     ,(g_glob.evp.event_p_id + i)->q_id[j]
+                                     , (g_glob.evp.event_p_id + i)->pri[j]  );
+          }
+       }
+       printf("\n");
+    }
+    printf("        }\n");
+
+    printf("             struct rte_spinlock_t lock : {\n");
+    printf("               -tbd- \n");
+    printf("`}\n");
+
+
+    printf("------------ eventdev ports -----------\n");
+
+
+
+    {
        printf(" struct rte_ether_addr      eth_addr[RTE_MAX_ETHPORTS];");
        for ( i = 0 ; i < p->nb_ports_available ; i++)
        {
           if ( i%4 == 0) printf("\n");
           printf("  %d) %s",i,format_mac_addr(eth_addr,&( p->eth_addr[i])));
        }
-       printf("\n        }\n");
+       printf("\n\n");
    }
 
 
@@ -120,56 +181,6 @@ int i,j;
     printf("        }\n");
 
 
-    printf(" struct event_queues  evq : {\n");
-    printf("         uint8_t nb_queues; %d \n",p->evq.nb_queues);
-    if (p->evq.nb_queues == 0 )
-    {
-         printf("           -- no evq array malloc-ed yet\n");
-    }
-    else
-    {
-       printf("       event_queue_cfg_t  arrayi\n");
-       printf("    queue    to_port  event_queue_cfg   schedule_type   priority\n");
-       for ( i = 0 ; i < p->evq.nb_queues ; i++)
-       {
-          printf("     %2d)      %2d         0x%08x           0x%02x         0x%02x \n",
-                     ((p->evq.event_q_cfg) + i)->event_q_id       ,
-                     ((p->evq.event_q_cfg) + i)->to_event_port    ,
-                     ((p->evq.event_q_cfg) + i)->ev_q_conf.event_queue_cfg ,
-                     ((p->evq.event_q_cfg) + i)->ev_q_conf.schedule_type ,
-                     ((p->evq.event_q_cfg) + i)->ev_q_conf.priority );
-       }
-       printf("\n");
-    }
-    printf("        }\n");
-
-
-    printf(" struct event_ports  evp : {\n");
-    printf("         uint8_t nb_ports; %d \n",p->evp.nb_ports);
-    if (p->evp.nb_ports == 0 )
-    {
-         printf("           -- no evp array malloc-ed yet\n");
-    }
-    else
-    {
-       for ( i = 0 ; i < p->evp.nb_ports ; i++)
-       {
-          printf("           port# %d \n",i);
-          printf("              number of queues  %d \n", (g_glob.evp.event_p_id + i)->nb_links);
-          for ( j = 0 ; j < (g_glob.evp.event_p_id + i)->nb_links ; j++)
-          {
-               printf("                %d) queue_id %d  queue_prioity %d\n",j
-                                     ,(g_glob.evp.event_p_id + i)->q_id[j]
-                                     , (g_glob.evp.event_p_id + i)->pri[j]  );
-          }
-       }
-       printf("\n");
-    }
-    printf("        }\n");
-
-    printf("             struct rte_spinlock_t lock : {\n");
-    printf("               -tbd- \n");
-    printf("`}\n");
 
    printf("%s",C_WHITE);
 
