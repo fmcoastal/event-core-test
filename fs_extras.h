@@ -97,10 +97,10 @@ static const char C_WHITE[]   ={0x1b,'[','3','7','m',0x00}; /* WHITE  =$'\e[37m'
 static const char C_NORMAL[]  ={0x1b,'[','0','m',0x00};     /* NORMAL =$'\e[0m'  */
 
 
-#define FONT_GREEN()  printf("%s",C_GREEN);
-#define FONT_CYAN()   printf("%s",C_CYAN);
-#define FONT_YELLOW()   printf("%s",C_YELLOW);
-#define FONT_NORMAL() printf("%s",C_NORMAL);
+#define FONT_GREEN()  printf("%s", C_GREEN);
+#define FONT_CYAN()   printf("%s", C_CYAN  );
+#define FONT_YELLOW() printf("%s", C_YELLOW);
+#define FONT_NORMAL() printf("%s", C_NORMAL);
 
 
 #endif

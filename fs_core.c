@@ -613,15 +613,16 @@ int core_loop( __attribute__((unused)) void * arg)
         // set to forward to next core.
         events[0].queue_id       = core_2_next_evt_queue_id[lcore_id] ;
         // set operation to forward packet    
-        // events[0].op             = RTE_EVENT_OP_FORWARD;  // this for some reason stops the event form forwarding
+        events[0].op             = RTE_EVENT_OP_FORWARD;  // this for some reason stops the event form forwarding
         events[0].flow_id        += 1;
         events[0].event_ptr  = (void *)message[core_2_next_message[lcore_id]]; 
 
  
+        print_rte_event(1, " about to stuff this  event[0]",&events[0]);
         rte_pause();
         usleep(1000000);     
  
-        ret = rte_event_enqueue_burst(event_dev_id, core_2_next_evt_port_id[lcore_id],
+        ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id],
                                 events, nb_rx);
         if( ret != 1 )
         {

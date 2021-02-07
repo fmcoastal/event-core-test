@@ -225,7 +225,7 @@ void  timer_event_init(void)
 
     //  create an event timer adapter instance
 struct rte_event_timer_adapter_conf time_adapter_config = {
-     .event_dev_id        = g_glob.event_d_id,
+     .event_dev_id        = g_glob.event_dev_id,
      .timer_adapter_id    = 0,
      .socket_id           = rte_socket_id(),    // numa socket
      .clk_src             = RTE_EVENT_TIMER_ADAPTER_CPU_CLK,
@@ -237,7 +237,7 @@ struct rte_event_timer_adapter_conf time_adapter_config = {
 
     WAI();
 
-    ret = rte_event_timer_adapter_caps_get(g_glob.event_d_id, &caps);
+    ret = rte_event_timer_adapter_caps_get(g_glob.event_dev_id, &caps);
     if ( ret != 0 )
     {
        printf("failed to get adapter capabilities  %d\n",ret);
@@ -598,7 +598,7 @@ rte_event_port_link()
 rte_event_dev_start()    // start the device in a separate function
 
 #if 0
-    event_d_id = 0;                 // event dev_id index/handle => SSO  0
+    event_dev_id = 0;                 // event dev_id index/handle => SSO  0
     nb_event_ports  = 0;         // event dev ports??
     memset(&(def_p_conf), 0, sizeof(struct rte_event_port_conf));  
          def_p_conf.dequeue_depth =1;        
@@ -655,9 +655,9 @@ uint32_t event_queue_cfg = 0;
             printf(" ** WARNING:: Number of  event dev devices found is not what is expected \n"); 
         }
         // WHY at least there is at least 1  device,  Index=0;
-        //  g_glob.event_d_id = 0;     // assign dev_id  to 0 --> set at the top of the function
+        //  g_glob.event_dev_id = 0;     // assign dev_id  to 0 --> set at the top of the function
 
-        printf(" g_glob.event_d_id:   %d \n", g_glob.event_d_id);
+        printf(" g_glob.event_dev_id:   %d \n", g_glob.event_dev_id);
    }
  
     
@@ -667,7 +667,7 @@ uint32_t event_queue_cfg = 0;
 //////////   Get default event_dev Setting and  Capabilities
    { 
         CALL_RTE("rte_event_dev_info_get()");
-        result = rte_event_dev_info_get( g_glob.event_d_id , &event_dev_capabilities );
+        result = rte_event_dev_info_get( g_glob.event_dev_id , &event_dev_capabilities );
         printf(" result    %d \n",result);
 	printf(" default: event_dev_capabilities \n");
         print_rte_event_dev_info(0,"event_dev_capabilities", &event_dev_capabilities);
@@ -695,13 +695,13 @@ uint32_t event_queue_cfg = 0;
         printf(" int rte_event_dev_configure( uint8_t dev_id,\n"
                "                              const struct rte_event_dev_config * dev_conf \n"
                "                             )\n");	
-        printf(  " Call Args: g_glob.event_d_id  %d  event_dev_config: \n",g_glob.event_d_id );
+        printf(  " Call Args: g_glob.event_dev_id  %d  event_dev_config: \n",g_glob.event_dev_id );
         FONT_NORMAL();
 #endif
         print_rte_event_dev_config( 0, "event_dev_config",0,&event_dev_config);   
     
         CALL_RTE("rte_event_dev_configure()"); 
-        result = rte_event_dev_configure( g_glob.event_d_id, &event_dev_config);
+        result = rte_event_dev_configure( g_glob.event_dev_id, &event_dev_config);
         if(result < 0)
         {
              printf(" rte_event_dev_configure() returned %d\n",result);
@@ -723,11 +723,11 @@ uint32_t event_queue_cfg = 0;
                "                                       uint8_t queue_id,\n"
                "                                       struct rte_event_queue_conf *	queue_conf \n"
                "                                       )\n");
-        printf(  " Call Args: g_glob.event_d_id:%d  event_q_id:%d  def_q_conf: \n",g_glob.event_d_id,event_q_id );
+        printf(  " Call Args: g_glob.event_dev_id:%d  event_q_id:%d  def_q_conf: \n",g_glob.event_dev_id,event_q_id );
         FONT_NORMAL();
 #endif
         CALL_RTE("rte_event_queue_default_conf_get()");    
-        rte_event_queue_default_conf_get( g_glob.event_d_id , event_q_id, &def_q_conf);
+        rte_event_queue_default_conf_get( g_glob.event_dev_id , event_q_id, &def_q_conf);
         
         printf(" default: event dev queue info: event_q_id=%d \n",event_q_id);
         printf("      struct rte_event_queue_conf *\n") ; 
@@ -776,13 +776,13 @@ uint32_t event_queue_cfg = 0;
 
 #ifdef PRINT_CALL_ARGUMENTS
            FONT_CALL_ARGUMENTS_COLOR();
-           printf(  " Call Args: g_glob.event_d_id:%d  event_q_id:%d  event_q_conf: \n",g_glob.event_d_id,event_q_id );
+           printf(  " Call Args: g_glob.event_dev_id:%d  event_q_id:%d  event_q_conf: \n",g_glob.event_dev_id,event_q_id );
            FONT_NORMAL();
 #endif
           // this is how I will configure each queue for this event dev:
            print_rte_event_queue_conf( 1 ,"event_q_id",event_q_id, &event_q_conf);
            CALL_RTE("call rte_event_queue_setup()");
-           ret = rte_event_queue_setup(g_glob.event_d_id , event_q_id,
+           ret = rte_event_queue_setup(g_glob.event_dev_id , event_q_id,
                                 &event_q_conf);
            if (ret < 0)
                 rte_panic("Error in configuring event queue\n");
@@ -804,7 +804,7 @@ uint32_t event_queue_cfg = 0;
        
       
        CALL_RTE("rte_event_port_default_conf_get()"); 
-       rte_event_port_default_conf_get(g_glob.event_d_id, 0, &def_p_conf);
+       rte_event_port_default_conf_get(g_glob.event_dev_id, 0, &def_p_conf);
 
        printf(" default: event port config  -> def_p_conf \n");
        printf("      struct rte_event_port_conf *\n") ; 
@@ -847,12 +847,12 @@ uint32_t event_queue_cfg = 0;
 
 #ifdef PRINT_CALL_ARGUMENTS
            FONT_CALL_ARGUMENTS_COLOR();
-           printf(  " Call Args: g_glob.event_d__id:%d  event_p_id:%d  event_p_conf: \n",g_glob.event_d_id,event_p_id );
+           printf(  " Call Args: g_glob.event_d__id:%d  event_p_id:%d  event_p_conf: \n",g_glob.event_dev_id,event_p_id );
            FONT_NORMAL();
 #endif
            print_rte_event_port_conf(1 , "event_p_conf", event_p_id, &event_p_conf);         
            CALL_RTE("rte_event_port_setup()");
-           ret = rte_event_port_setup( g_glob.event_d_id , event_p_id,  &event_p_conf);
+           ret = rte_event_port_setup( g_glob.event_dev_id , event_p_id,  &event_p_conf);
            if (ret < 0)
                rte_panic("Error in configuring event port %d\n", event_p_id);
        }
@@ -875,7 +875,7 @@ uint32_t event_queue_cfg = 0;
 
 
 
-        printf(" Linking event_ports to event_queues on event_dev_id:%d \n ",g_glob.event_d_id); 
+        printf(" Linking event_ports to event_queues on event_dev_id:%d \n ",g_glob.event_dev_id); 
         for ( port  = 0; port  < (g_glob.evp.nb_ports) ; port ++) 
         {
              array_sz         =    (g_glob.evp.event_p_id + port)->nb_links ;
@@ -894,7 +894,7 @@ uint32_t event_queue_cfg = 0;
                                          , *( priorities_array +index) );
              }
 
-            printf("           int rte_event_port_link( uint8_t dev_id,    = %d  (g_glob.event_d_id)\n", g_glob.event_d_id);
+            printf("           int rte_event_port_link( uint8_t dev_id,    = %d  (g_glob.event_dev_id)\n", g_glob.event_dev_id);
             printf("                                    uint8_t port_id,   = %d  (port) \n",port);
             printf("                                    const uint8_t 	queues[],   %p     \n",queues_array);
             printf("                                    const uint8_t 	priorities[] %p \n", priorities_array);   
@@ -905,7 +905,7 @@ uint32_t event_queue_cfg = 0;
             FONT_NORMAL();
  #endif
             CALL_RTE("rte_event_port_link()");
-            ret = rte_event_port_link ( g_glob.event_d_id , port , queues_array, priorities_array, array_sz);
+            ret = rte_event_port_link ( g_glob.event_dev_id , port , queues_array, priorities_array, array_sz);
             if (ret != array_sz )
             {
                rte_panic("Error in rte_event_port_link() requested %d successfull %d\n",array_sz,ret);
@@ -922,7 +922,7 @@ uint32_t event_queue_cfg = 0;
         int32_t ret;
         //  THis might be for SW version of event dev MGR???  But sure what this is and how it is used.
         CALL_RTE("rte_event_dev_service_id_get()");
-        ret = rte_event_dev_service_id_get( g_glob.event_d_id,
+        ret = rte_event_dev_service_id_get( g_glob.event_dev_id,
                                 &evdev_service_id);
         if (ret != -ESRCH && ret != 0) {
                 rte_panic("Error getting the service ID for sw eventdev\n");
@@ -946,7 +946,7 @@ void start_event_dev(void)
         int32_t ret;
  
         CALL_RTE("rte_event_dev_start()");
-        ret = rte_event_dev_start( g_glob.event_d_id );
+        ret = rte_event_dev_start( g_glob.event_dev_id );
         if (  ret  < 0)
         {
                 printf(" Event Dev Device Start failed:  %d \n",ret);
@@ -972,7 +972,7 @@ void  rx_tx_adapter_setup_internal_port(void);
 void  rx_tx_adapter_setup_internal_port(void)
 {
     struct   rte_event_eth_rx_adapter_queue_conf eth_q_conf;
-    uint8_t  event_d_id = g_glob.event_d_id;   
+    uint8_t  event_dev_id = g_glob.event_dev_id;   
     uint16_t adapter_id = 0;
     uint16_t nb_adapter = 0;
     uint16_t port_id;
@@ -996,12 +996,12 @@ WAI();
                 "                                     uint8_t 	dev_id,\n"
                 "                                     struct rte_event_port_conf * port_config\n" 
                 "                                     )\n");	
-         printf(  " Call Args: adapter_id %d  event_d_id %d  rte_event_port_conf: \n",adapter_id,event_d_id);
+         printf(  " Call Args: adapter_id %d  event_dev_id %d  rte_event_port_conf: \n",adapter_id,event_dev_id);
          FONT_NORMAL();
 #endif
          print_rte_event_port_conf(1,"---create--- def_p_conf",adapter_id,&g_glob.def_p_conf);
          CALL_RTE("rte_event_eth_rx_adapter_create()");
-         ret = rte_event_eth_rx_adapter_create(adapter_id, event_d_id,
+         ret = rte_event_eth_rx_adapter_create(adapter_id, event_dev_id,
                                                 &g_glob.def_p_conf);
          if (ret)
                rte_panic("Failed to create rx adapter[%d]\n", adapter_id);
@@ -1052,15 +1052,15 @@ WAI();
          print_rte_event_port_conf(1,"---create--- def_p_conf",port_id,&g_glob.def_p_conf);
 #ifdef PRINT_CALL_ARGUMENTS
          FONT_CALL_ARGUMENTS_COLOR();
-         printf(" Call Args: adpater_id: %d, event_d_id:%d, struct def_p_conf)\n",
+         printf(" Call Args: adpater_id: %d, event_dev_id:%d, struct def_p_conf)\n",
                                  adapter_id,
-                                 event_d_id );
+                                 event_dev_id );
          FONT_NORMAL();
 #endif
          print_rte_event_port_conf(1,"---create--- def_p_conf",adapter_id ,&g_glob.def_p_conf);
 
          CALL_RTE("rte_event_eth_tx_adapter_create()");
-         ret = rte_event_eth_tx_adapter_create(adapter_id, event_d_id,
+         ret = rte_event_eth_tx_adapter_create(adapter_id, event_dev_id,
                                     &(g_glob.def_p_conf));
          if (ret)
                 rte_panic("Failed to create tx adapter[%d]\n",adapter_id);
@@ -1098,7 +1098,7 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 
     g_glob.enabled_port_mask = 0x03 ;                // cmd line -p argument - here I hardwired :-0    
     g_glob.nb_ports_available = 0;                   // calculated based on  g_glob.enabled_port_mask
-    g_glob.event_d_id = 0;                           // event dev_id index/handle => SSO  0
+    g_glob.event_dev_id = 0;                           // event dev_id index/handle => SSO  0
 
     memset(&(g_glob.def_p_conf), 0, sizeof(struct rte_event_port_conf));  
          g_glob.def_p_conf.dequeue_depth =1;        
@@ -1337,7 +1337,7 @@ int ethdev_setup( __attribute__((unused)) void * arg)
          {
           
          CALL_RTE("rte_event_eth_rx_adapter_caps_get()");
-         ret = rte_event_eth_rx_adapter_caps_get(g_glob.event_d_id,
+         ret = rte_event_eth_rx_adapter_caps_get(g_glob.event_dev_id,
                                   g_glob.rx_adptr.rx_adptr[i], &caps);
          if( ret != 0)
          {
@@ -1345,7 +1345,7 @@ int ethdev_setup( __attribute__((unused)) void * arg)
          }
          printf("rte_event_eth_rx_adapter_caps:0x%8x \n",caps );
 
-         ret = rte_event_eth_tx_adapter_caps_get(g_glob.event_d_id,
+         ret = rte_event_eth_tx_adapter_caps_get(g_glob.event_dev_id,
                                   g_glob.tx_adptr.tx_adptr[i], &caps);
          if( ret != 0)
          {
@@ -1403,7 +1403,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
     int core_counter = 0;
 
     lcore_id   = rte_lcore_id();      // my core index
-    event_dev_id     = g_glob.event_d_id;   // id of my event device
+    event_dev_id     = g_glob.event_dev_id;   // id of my event device
     port_id    = lcore_id;            // I have 1 port associated with 1 core.  
                                       //   problem here could be lcore 19,20,21,22 
                                       //           does not map port index 0,1,2,3 
@@ -1619,13 +1619,13 @@ int ethdev_cleanup(__attribute__((unused)) void * arg)
 {
      // print the results from each core
 
-     rte_event_dev_dump( g_glob.event_d_id  ,stdout);
+     rte_event_dev_dump( g_glob.event_dev_id  ,stdout);
 
 
 // Stop the device
 
     printf("************\n    stopping the event_dev device  sso   \n***************\n");
-     rte_event_dev_stop (g_glob.event_d_id);
+     rte_event_dev_stop (g_glob.event_dev_id);
 
 //   CLose the event dev device
 
@@ -1635,7 +1635,7 @@ int ethdev_cleanup(__attribute__((unused)) void * arg)
 /* int rte_event_dev_close (   uint8_t     dev_id  )   
 Close an event device. The device cannot be restarted! */
     printf("************\n    closing the event_dev device  sso   \n***************\n");
-     rte_event_dev_close( g_glob.event_d_id );
+     rte_event_dev_close( g_glob.event_dev_id );
 
 
 /* clear ethdev resourcesi*/

@@ -5,16 +5,78 @@
 
 // structures to configure varaious 
 
+
+
+/* I am going to cheese out here.
+   I am going initialze by
+
+   f0r ( i = 0 ; i < nb_xx_adptr ;i++)
+         create the adapte()
+         for( j = 0 ; j < nb_rx_adapter_add; j++)
+         {
+            if(rx_adapter[i] == rx_adapter_add[j].adapter_id
+            {
+                setup and call
+                event_rx_adapter_add()
+            }
+         }
+     }
+
+
+*/
+
+////////////////////////////////////
+//   parameters to configue event rx_adapters 
+//      ties eth queues to event queues
+//        also sets atomic/ordered/parallel
+typedef struct event_rx_adapter_add_struct
+{
+    uint32_t adapter_id;        // index of rx_adapter to tye "add" function to
+    uint8_t eth_dev_port;       // eth_dev_port
+    uint8_t eth_dev_queue;      // eth_dev_queue
+    uint8_t event_dev_queue;    // event_dev_queue for this eth queue /rte_flow queue 
+    uint8_t sched_type;           // atomic/ordered/paralle;
+    uint8_t priority;           // Per Eng, priority will actuall be set by priority
+                                //    of event dev queue, not this.  I added here
+                                //    to help me keep things straight when I
+                                //    manuall fill the structures. 
+} event_rx_adapter_add_t;
+
+
 struct event_rx_adptr {
         uint32_t service_id;
+
         uint8_t nb_rx_adptr;
         uint8_t *rx_adptr;
+
+        uint8_t nb_rx_adptr_add;
+        event_rx_adapter_add_t *rx_adptr_add;
 };
+
+
+
+
+////////////////////////////////////
+//   parameters to configue event rx_adapters 
+//      ties eth queues to event queues
+//        also sets atomic/ordered/parallel
+typedef struct event_tx_adapter_add_struct
+{
+    uint32_t adapter_id;        // index of rx_adapter to tye "add" function to
+    uint8_t eth_dev_port;       // eth_dev_port
+    uint8_t eth_dev_queue;      // eth_dev_queue
+
+} event_tx_adapter_add_t;
+
 
 struct event_tx_adptr {
         uint32_t service_id;
+
         uint8_t nb_tx_adptr;
         uint8_t *tx_adptr;
+
+        uint8_t nb_tx_adptr_add;
+        event_tx_adapter_add_t *tx_adptr_add;
 };
 
 

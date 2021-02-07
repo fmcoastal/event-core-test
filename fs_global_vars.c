@@ -61,23 +61,34 @@ void print_global_data (global_data_t *p)
 char eth_addr[30];
 int i,j;
    printf("%s",C_RED);
-   printf(" uint16_t  enabled_port_mask            = %d \n",p->enabled_port_mask);
-   printf(" uint16_t  nb_ports_available           = %d \n",p->nb_ports_available);
-   printf(" uint16_t  event_d_id                   = %d \n",p->event_d_id);
+   printf(" uint16_t  enabled_eth_port_mask            = %d \n",p->enabled_eth_port_mask);
+   printf(" uint16_t  nb_eth_ports_available           = %d \n",p->nb_eth_ports_available);
+   printf(" uint16_t  event_dev_id                   = %d \n",p->event_dev_id);
    printf(" struct    rte_mempool* p_pktmbuf_pool  = %p \n",p->p_pktmbuf_pool);
 
+   printf("\n");
+   printf("------------ eth_dev  port mac addresses  -----------\n");
+   {
+      printf(" struct rte_ether_addr      eth_addr[RTE_MAX_ETHPORTS];");
+      for ( i = 0 ; i < p->nb_eth_ports_available ; i++)
+      {
+         if ( i%4 == 0) printf("\n");
+         printf("  %d) %s",i,format_mac_addr(eth_addr,&( p->eth_addr[i])));
+      }
+      printf("\n");
+   }
 
-
-    printf("------------ eventdev queues -----------\n");
-    printf(" struct event_queues  evq : {\n");
-    printf("         uint8_t nb_queues; %d \n",p->evq.nb_queues);
-    if (p->evq.nb_queues == 0 )
-    {
+   printf("\n");
+   printf("------------ eventdev queues -----------\n");
+   printf(" struct event_queues  evq : {\n");
+   printf("         uint8_t nb_queues; %d \n",p->evq.nb_queues);
+   if (p->evq.nb_queues == 0 )
+   {
          printf("           -- no evq array malloc-ed yet\n");
-    }
-    else
-    {
-       printf("       event_queue_cfg_t  arrayi\n");
+   }
+   else
+   {
+       printf("       event_queue_cfg_t  array\n");
        printf("    queue    to_port  event_queue_cfg   schedule_type   priority\n");
        for ( i = 0 ; i < p->evq.nb_queues ; i++)
        {
@@ -89,19 +100,19 @@ int i,j;
                      ((p->evq.event_q_cfg) + i)->ev_q_conf.priority );
        }
        printf("\n");
-    }
-    printf("        }\n");
+   }
+   printf("        }\n");
 
-
-    printf("------------ eventdev ports -----------\n");
-    printf(" struct event_ports  evp : {\n");
-    printf("         uint8_t nb_ports; %d \n",p->evp.nb_ports);
-    if (p->evp.nb_ports == 0 )
-    {
+   printf("\n");
+   printf("------------ eventdev ports -----------\n");
+   printf(" struct event_ports  evp : {\n");
+   printf("         uint8_t nb_ports; %d \n",p->evp.nb_ports);
+   if (p->evp.nb_ports == 0 )
+   {
          printf("           -- no evp array malloc-ed yet\n");
-    }
-    else
-    {
+   }
+   else
+   {
        for ( i = 0 ; i < p->evp.nb_ports ; i++)
        {
           printf("           port# %d \n",i);
@@ -114,32 +125,21 @@ int i,j;
           }
        }
        printf("\n");
-    }
-    printf("        }\n");
-
-    printf("             struct rte_spinlock_t lock : {\n");
-    printf("               -tbd- \n");
-    printf("`}\n");
-
-
-    printf("------------ eventdev ports -----------\n");
-
-
-
-    {
-       printf(" struct rte_ether_addr      eth_addr[RTE_MAX_ETHPORTS];");
-       for ( i = 0 ; i < p->nb_ports_available ; i++)
-       {
-          if ( i%4 == 0) printf("\n");
-          printf("  %d) %s",i,format_mac_addr(eth_addr,&( p->eth_addr[i])));
-       }
-       printf("\n\n");
    }
+   printf("        }\n");
 
+   printf("             struct rte_spinlock_t lock : {\n");
+   printf("               -tbd- \n");
+   printf("              }\n");
 
+    printf("\n");
+    printf("---------- event_dev  adapter default config  --------\n");
     print_rte_event_port_conf(1,"def_p_conf",0,&(p->def_p_conf));
     printf("%s",C_RED);
 
+
+    printf("\n");
+    printf("------------ eventdev rx_adapters -----------\n");
     printf(" struct event_rx_adapter rx_adptr : {\n");
     printf("         uint32_t service_id; %d \n",p->rx_adptr.service_id);
     printf("         uint8_t nb_rx_adptr; %d \n",p->rx_adptr.nb_rx_adptr);
@@ -152,15 +152,41 @@ int i,j;
        printf("         uint8_t * rx_adptr array");
        for ( i = 0 ; i < p->rx_adptr.nb_rx_adptr ; i++)
        {
-          if ( i%4 == 0) printf("\n       ");
+          if ( i%4 == 0) printf("\n           ");
           printf("   %d) %2d",i,*(p->rx_adptr.rx_adptr+i));
+       }
+       printf("\n");
+    }
+    printf("\n");
+    printf("         uint8_t nb_rx_adptr_add; %d \n",p->rx_adptr.nb_rx_adptr_add);
+    if (p->rx_adptr.nb_rx_adptr_add == 0 )
+    {
+         printf("           -- no rx_adptr_add array malloc-ed yet\n");
+    }
+    else
+    {
+       printf("         uint8_t * rx_adptr_add array\n");
+       printf("             uint32_t  uint8_t  uint8_t  uint8_t    uint8_t  uint8_t \n");
+       printf("             adapter   eth_dev  eth_dev  event_dev  sched    Priority\n");
+       printf("             id        port     queue    queue      type     \n");
+       for ( i = 0 ; i < p->rx_adptr.nb_rx_adptr_add ; i++)
+       {
+       printf("            %2d        %2d       %2d       %2d         %2d        %3d \n",
+                                       p->rx_adptr.rx_adptr_add[i].adapter_id,   
+                                       p->rx_adptr.rx_adptr_add[i].eth_dev_port,   
+                                       p->rx_adptr.rx_adptr_add[i].eth_dev_queue,   
+                                       p->rx_adptr.rx_adptr_add[i].event_dev_queue,   
+                                       p->rx_adptr.rx_adptr_add[i].sched_type,   
+                                       p->rx_adptr.rx_adptr_add[i].priority   
+                                        );
        }
        printf("\n");
     }
     printf("        }\n");
 
 
-
+    printf("\n");
+    printf("------------ eventdev tx_adapters -----------\n");
     printf(" struct event_tx_adapter tx_adptr : {\n");
     printf("         uint32_t service_id; %d \n",p->tx_adptr.service_id);
     printf("         uint8_t nb_tx_adptr; %d \n",p->tx_adptr.nb_tx_adptr);
@@ -173,14 +199,32 @@ int i,j;
        printf("         uint8_t * tx_adptr array");
        for ( i = 0 ; i < p->tx_adptr.nb_tx_adptr ; i++)
        {
-          if ( i%4 == 0) printf("\n     ");
+          if ( i%4 == 0) printf("\n         ");
           printf("   %d) %2d",i,*(p->tx_adptr.tx_adptr+i));
        }
        printf("\n");
     }
+    printf("         uint8_t nb_tx_adptr_add; %d \n",p->tx_adptr.nb_tx_adptr_add);
+    if (p->tx_adptr.nb_tx_adptr_add == 0 )
+    {
+         printf("           -- no tx_adptr_add array malloc-ed yet\n");
+    }
+    else
+    {
+       printf("         uint8_t * tx_adptr_add array\n");
+       printf("            uint32_t    uint8_t       uint8_t      \n");
+       printf("            adapter_id  eth_dev_port  eth_dev_queue\n");
+       for ( i = 0 ; i < p->rx_adptr.nb_rx_adptr_add ; i++)
+       {
+       printf("               %2d         %2d          %2d            \n",
+                                       p->rx_adptr.rx_adptr_add[i].adapter_id,   
+                                       p->rx_adptr.rx_adptr_add[i].eth_dev_port,   
+                                       p->rx_adptr.rx_adptr_add[i].eth_dev_queue   
+                                        );
+       }
+       printf("\n");
+    }
     printf("        }\n");
-
-
 
    printf("%s",C_WHITE);
 
