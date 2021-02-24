@@ -27,7 +27,7 @@ echo #--  inform vfio_pci about SSO  --"
      
      #manually reset driver limits
      
-     echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/tim
+     echo 1 > /sys/bus/pci/devices/0002:0e:00.0/limits/tim
      echo 1 > /sys/bus/pci/devices/0002:0e:00.0/limits/npa
      echo 16 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
      # set limit 26 for 8 or less core
