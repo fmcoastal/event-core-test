@@ -1,6 +1,6 @@
-# dpdk_test_app
+# evemt-core-test
 
-The dpdk_test_app is "test harness code".  The base code (see main.c) does 
+The event-core-test is built on the "test harness code".  The base code (see main.c) does 
       not set up any IO. It can be used to debug and profile code. Test code 
       files (fs_lpm.c and fs_spinlock.c) can be copied and modified to 
       enable the code you want to test. 
@@ -26,8 +26,17 @@ The dpdk_test_app is "test harness code".  The base code (see main.c) does
          available.
 
 
+      Special Files:
+             x       - use this as a reference for starting the dpdk application
+             f_fixes - use this to attach devices to vfio-pci
+           
+      Notes:
+          The test are very hard wired with respect to cores, number on interfaces.
+              Incorrect interface cli parameters will cause execution to fail
 
-To Get Help Output:
+
+
+To Get Help Output on test_app:
 
          root@localhost:/home/fsmith/dpdk_test_app# ./build/test_app
 
@@ -79,6 +88,8 @@ To Build
       > export RTE_SDK=/home/fsmith/dpdk/dpdk-19.11
 
     * to run
+      ./huge_mem_cfg
+      sudo dpdk_cfg
       sudo ./build/test_app -c 0x0001  -- -t 1
 
   -- Buildroot Environment 
