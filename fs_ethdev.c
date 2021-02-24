@@ -565,6 +565,8 @@ void check_ports_link_status(uint32_t port_mask)
 }
 
 
+#if 0
+
 //void print_event_queue_cfg
 
 /**********************************
@@ -954,7 +956,7 @@ void start_event_dev(void)
         }
     }
  
-
+#endif
 
 
 ////////////////////////////////////////////////////

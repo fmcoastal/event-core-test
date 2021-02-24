@@ -6,6 +6,9 @@
 // structures to configure varaious 
 
 
+extern const char * StringSched[];    // defined in fs_core.c   should be defined here
+
+
 
 /* I am going to cheese out here.
    I am going initialze by
@@ -140,6 +143,9 @@ void  print_rte_event_dev_info(int indent,const char* string, struct rte_event_d
 
 #endif
 
+void start_event_dev(void);
+
+void Initialize_EventDev(void);
 
 
 

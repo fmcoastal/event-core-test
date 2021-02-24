@@ -396,7 +396,7 @@ int lcore_id_loop( __attribute__((unused)) void * arg)
     unsigned lcore_id;
     char string[256];
     int  i;
-    int  x;
+    int  x = 0;
 //   int32_t x = -1 ;
 //    if (arg != NULL ) x = *(int32_t *)arg;
 //    printf("dummy loop function %d\n",x);
