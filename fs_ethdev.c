@@ -1649,7 +1649,8 @@ int ethdev_loop( __attribute__((unused)) void * arg)
         g_ev_timer.ev.priority       = 0x40 ;                    // uint8_t  priority;
         //g_ev_timer.ev.impl_opaque    =  ; // uint8_t  impl_opaque;
 
-        g_ev_timer.ev.event_ptr  = (void *) (ethdev_message[lcore_id]) ;  // set the second 64 bits to point at a payload
+        g_ev_timer.ev.event_ptr  = (void *) ( &g_ev_timer) ;  // set the second 64 bits to point at a payload
+
 
 #ifdef PRINT_CALL_ARGUMENTS
         FONT_CALL_ARGUMENTS_COLOR();
@@ -1658,7 +1659,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
 #endif
         print_rte_event( 1, "g_ev_timer.ev",&(g_ev_timer.ev));
         CALL_RTE("rte_event_enqueue_burst() ");
-        ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id]  ,&g_ev, 1 );
+        ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id]  ,&g_ev_timer.ev, 1 );
         if( ret != 1 )
         {
              printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
@@ -1701,7 +1702,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                  // set to forward to next core.
                  events[i].queue_id       = core_2_next_evt_queue_id[lcore_id];
                  // set operation to forward packet    
-                 // events[i].op             = RTE_EVENT_OP_FORWARD;  // this for some reason stops the event form forwarding
+                 events[i].op             = RTE_EVENT_OP_FORWARD;  // this for some reason stops the event form forwarding
                  events[i].flow_id        += 1;
                  events[i].priority        = 0x40 ; 
                  events[i].event_ptr       = (void *)ethdev_message[core_2_next_message[lcore_id]] ; 
@@ -1710,7 +1711,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                  rte_pause();
                  usleep(500000);     
 
-                 ret = rte_event_enqueue_burst(event_dev_id, core_2_next_evt_port_id[lcore_id],
+                 ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id],
                                      &(events[i]) , 1);
                  if( ret != 1 )
                  {

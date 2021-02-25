@@ -70,8 +70,8 @@
 extern uint64_t  g_core_messages;
 extern int64_t g_print_interval;
 
-void time_print_setup(void);
-void time_print_setup(void)
+void timer_print_setup(void);
+void timer_print_setup(void)
 {
 printf("\n"
 "  ------------                                     \n"
@@ -224,11 +224,10 @@ int timer_setup( __attribute__((unused)) void * arg)
 {
 
     WAI();
-   print_setup(); 
+    timer_print_setup();
 
-
-    g_glob.enabled_port_mask = 0x03 ;                // cmd line -p argument - here I hardwired :-0    
-    g_glob.nb_ports_available = 0;                   // calculated based on  g_glob.enabled_port_mask
+    g_glob.enabled_eth_port_mask = 0x03 ;                // cmd line -p argument - here I hardwired :-0    
+    g_glob.nb_eth_ports_available = 0;                   // calculated based on  g_glob.enabled_port_mask
     g_glob.event_dev_id = 0;                           // event dev_id index/handle => SSO  0
 
     memset(&(g_glob.def_p_conf), 0, sizeof(struct rte_event_port_conf));  
@@ -443,7 +442,7 @@ int timer_setup( __attribute__((unused)) void * arg)
 //    create tx_adapters    
 //    associate adapter to eth queue and event queue
  
-    rx_tx_adapter_setup_internal_port();;
+//    rx_tx_adapter_setup_internal_port();;
 
 /////
 /////
@@ -458,9 +457,9 @@ int timer_setup( __attribute__((unused)) void * arg)
 /////  Start the ethernet interfaces
 /////
 /////
+#if  0 
      ethdev_start();
 
-#if  1 
     {
     //     uint32_t service_id;
          uint32_t caps,i,ret ;
@@ -509,8 +508,8 @@ char * timer_message[] = {timer_m0,timer_m1,timer_m2,timer_m3};
 
 
 #define G_COUNTER_PRINT 3000000 // 0 = print every message
-extern int g_message_counter = 0;
-extern int g_drop_all_traffic = 0;
+extern int g_message_counter ;
+extern int g_drop_all_traffic ;
 
 struct rte_event       g_ev;          // use this to encode an event.
 struct rte_event_timer g_ev_timer;    // use this to encode a timer event.
@@ -527,9 +526,13 @@ int timer_loop( __attribute__((unused)) void * arg)
    
     struct rte_event events[BATCH_SIZE];
     uint16_t nb_rx; 
-    uint8_t  next_core[] = {1,2,3,0};  
     uint16_t ret;
     int i;
+    uint8_t core_2_message[]           = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,1,2,3 };
+    uint8_t core_2_evt_port_id[]       = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,1,2,3 };
+    uint8_t core_2_next_evt_queue_id[] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 1,2,3,0 };
+    uint8_t event_port_id ;
+    struct rte_event_timer *p_ev_timer;   // pointer to timer event
 
     int core_counter = 0;
 
@@ -539,9 +542,22 @@ int timer_loop( __attribute__((unused)) void * arg)
                                       //   problem here could be lcore 19,20,21,22 
                                       //           does not map port index 0,1,2,3 
 
-    if( lcore_id == 0 )
-    {
 
+     if( ! ( rte_lcore_is_enabled(20)  &&
+             rte_lcore_is_enabled(21)  &&
+             rte_lcore_is_enabled(22)  &&
+             rte_lcore_is_enabled(23) ))
+     {
+         printf(" this function expects you to use cores 20,21,22,24i (-c 0xf00000) ");
+         rte_panic(" use the correct cores, or fix the core_2_port/message/queue mappings");
+     }
+
+     lcore_id       = rte_lcore_id();             // my core index
+     event_dev_id   = g_glob.event_dev_id;          // id of my event device
+     event_port_id  = core_2_evt_port_id[ lcore_id ]; // for now, I have 1 port associated with 1 core.
+
+     if( (lcore_id == 20 )  && ( g_core_messages == 1))
+     {
         printf("*** Put an event into the Event Dev Scheduler ***\n");
 
         printf("        event_dev_id: %d \n ",event_dev_id);
@@ -549,88 +565,86 @@ int timer_loop( __attribute__((unused)) void * arg)
         printf("        lcore_id: %d \n ",lcore_id);
         printf("        print every : %ldth  \n ",g_print_interval);
 
-        // cmd line option to send inter-core operations
-        if ( g_core_messages == 1)
-        {
-            memset(&g_ev,0, sizeof(struct rte_event)); 
-            g_ev.event=0;    // set event "union" fields to 0
-            g_ev.event_ptr  = (void *) (ethdev_message[lcore_id]) ;  // set the second 64 bits to point at a payload
+
+#if 0
+       memset(&g_ev,0, sizeof(struct rte_event)); 
+       g_ev.event=0;    // set event "union" fields to 0
+       g_ev.event_ptr  = (void *) (timer_message[lcore_id]) ;  // set the second 64 bits to point at a payload
      
 // In order to get sso to deliver, I have to add the following to the WQE
-            g_ev.flow_id        = 0xDEAD;                 // uint32_t flow_id:20;
-            g_ev.sub_event_type = RTE_EVENT_TYPE_CPU ;    // uint32_t sub_event_type:8;
-            g_ev.event_type     = RTE_EVENT_TYPE_CPU ;    // uint32_t event_type:4;
-            g_ev.op             = RTE_EVENT_OP_NEW;         // uint8_t op:2; NEW,FORWARD or RELEASE
-            //g_ev.rsvd           =  ;                      // uint8_t rsvd:4;
-            g_ev.sched_type     = RTE_SCHED_TYPE_PARALLEL ;       // uint8_t  sched_type:2;
-            g_ev.queue_id       = 0 ;                             // uint8_t  queue_id;
-            g_ev.priority       = RTE_EVENT_DEV_PRIORITY_NORMAL ; // uint8_t  priority;
-            //g_ev.impl_opaque    =  ; // uint8_t  impl_opaque;
+       g_ev.flow_id        = 0xDEAD;                 // uint32_t flow_id:20;
+       g_ev.sub_event_type = RTE_EVENT_TYPE_CPU ;    // uint32_t sub_event_type:8;
+       g_ev.event_type     = RTE_EVENT_TYPE_CPU ;    // uint32_t event_type:4;
+       g_ev.op             = RTE_EVENT_OP_NEW;         // uint8_t op:2; NEW,FORWARD or RELEASE
+       //g_ev.rsvd           =  ;                      // uint8_t rsvd:4;
+       g_ev.sched_type     = RTE_SCHED_TYPE_PARALLEL ;       // uint8_t  sched_type:2;
+       g_ev.queue_id       = 0 ;                             // uint8_t  queue_id;
+       g_ev.priority       = RTE_EVENT_DEV_PRIORITY_NORMAL ; // uint8_t  priority;
+       //g_ev.impl_opaque    =  ; // uint8_t  impl_opaque;
      
      
 #ifdef PRINT_CALL_ARGUMENTS
-            FONT_CALL_ARGUMENTS_COLOR();
-            printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,lcore_id);
-            FONT_NORMAL();
+       FONT_CALL_ARGUMENTS_COLOR();
+       printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,lcore_id);
+       FONT_NORMAL();
 #endif
-            print_rte_event( 1, "g_ev",&g_ev);
-            CALL_RTE("rte_event_enqueue_burst() ");
-            ret = rte_event_enqueue_burst(event_dev_id, lcore_id  ,&g_ev, 1 );
-            if( ret != 1 )
-            {
-                 printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
-                 printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
-                 rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
-            }
+      print_rte_event( 1, "g_ev",&g_ev);
+      CALL_RTE("rte_event_enqueue_burst() ");
+      ret = rte_event_enqueue_burst(event_dev_id, lcore_id  ,&g_ev, 1 );
+      if( ret != 1 )
+      {
+           printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
+           printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
+           rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
+      }
+#endif
+      //  set up the timer event 
 
-        //  set up the timer event 
+      memset(&g_ev_timer,0, sizeof(struct rte_event_timer)); 
 
-            memset(&g_ev_timer,0, sizeof(struct rte_event_timer)); 
-
-            g_ev_timer.state  =  RTE_EVENT_TIMER_NOT_ARMED;  // set this per documentation
-            g_ev_timer.timeout_ticks = 5*1000000000;         //time in ns (5 seconds for now)
-            // g_ev_timer.impl_opaque[2] ;  per documentation, do not touch
-            g_ev_timer.user_meta = 0;                        // my application defined data
+      g_ev_timer.state  =  RTE_EVENT_TIMER_NOT_ARMED;  // set this per documentation
+      g_ev_timer.timeout_ticks = 1000000000;         //time in ns (5 seconds for now)
+      // g_ev_timer.impl_opaque[2] ;  per documentation, do not touch
+      g_ev_timer.user_meta[0] = 0;                        // my application defined data
 
 // In order to get sso to deliver, I have to add the following to the WQE
-            g_ev_timer.ev.event=0;    // set event "union" fields to 0
-             
-            g_ev_timer.ev.flow_id        = 0x07734;                 // uint32_t flow_id:20;
-            g_ev_timer.ev.sub_event_type = RTE_EVENT_TYPE_TIMER ;    // uint32_t sub_event_type:8;
-            g_ev_timer.ev.event_type     = RTE_EVENT_TYPE_TIMER ;    // uint32_t event_type:4;
-            g_ev_timer.ev.op             = RTE_EVENT_OP_NEW;         // uint8_t op:2; NEW,FORWARD or RELEASE
-            //g_ev_timer.ev.rsvd           =  ;                      // uint8_t rsvd:4;
-            g_ev_timer.ev.sched_type     = RTE_SCHED_TYPE_PARALLEL ;       // uint8_t  sched_type:2;
-            g_ev_timer.ev.queue_id       = 1 ;                             // uint8_t  queue_id; event queue message will be placed in
-            g_ev_timer.ev.priority       = 0x40 ;                    // uint8_t  priority;
-            //g_ev_timer.ev.impl_opaque    =  ; // uint8_t  impl_opaque;
+      g_ev_timer.ev.event=0;    // set event "union" fields to 0
+       
+      g_ev_timer.ev.flow_id        = 0x07734;                 // uint32_t flow_id:20;
+      g_ev_timer.ev.sub_event_type = RTE_EVENT_TYPE_TIMER ;    // uint32_t sub_event_type:8;
+      g_ev_timer.ev.event_type     = RTE_EVENT_TYPE_TIMER ;    // uint32_t event_type:4;
+      g_ev_timer.ev.op             = RTE_EVENT_OP_NEW;         // uint8_t op:2; NEW,FORWARD or RELEASE
+      //g_ev_timer.ev.rsvd           =  ;                      // uint8_t rsvd:4;
+      g_ev_timer.ev.sched_type     = RTE_SCHED_TYPE_PARALLEL ;       // uint8_t  sched_type:2;
+      g_ev_timer.ev.queue_id       = 0 ;                             // uint8_t  queue_id; event queue message will be placed in
+      g_ev_timer.ev.priority       = 0x40 ;                    // uint8_t  priority;
+      //g_ev_timer.ev.impl_opaque    =  ; // uint8_t  impl_opaque;
 
-            g_ev_timer.ev.event_ptr  = (void *) (ethdev_message[lcore_id]) ;  // set the second 64 bits to point at a payload
+      g_ev_timer.ev.event_ptr  = (void *) &g_ev_timer ;  // set the second 64 bits to point this event structure
+
+
 
 #ifdef PRINT_CALL_ARGUMENTS
-            FONT_CALL_ARGUMENTS_COLOR();
-            printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,lcore_id);
-            FONT_NORMAL();
+      FONT_CALL_ARGUMENTS_COLOR();
+      printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,lcore_id);
+      FONT_NORMAL();
 #endif
-            print_rte_event( 1, "g_ev_timer.ev",&(g_ev_timer.ev));
-            CALL_RTE("rte_event_enqueue_burst() ");
-            ret = rte_event_enqueue_burst(event_dev_id, lcore_id  ,&g_ev, 1 );
-            if( ret != 1 )
-            {
-                 printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
-                 printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
-                 rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
-            }
-
-
-
+      print_rte_event( 1, "g_ev_timer.ev",&(g_ev_timer.ev));
+      CALL_RTE("rte_event_enqueue_burst() ");
+      ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id]  ,&g_ev_timer.ev  , 1 );
+      if( ret != 1 )
+      {
+           printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
+           printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
+           rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
+      }
 
    }
 
 
 // struct worker_data *data = (struct worker_data *)arg;
 
-    printf(" Launch code on Core: %d\n",lcore_id);
+    printf(" Launch code on Core: %d event_port %d \n",lcore_id, event_port_id);
     while (!g_force_quit)
     {
        // lots of handwaving here.  there should be only one event 
@@ -653,21 +667,17 @@ int timer_loop( __attribute__((unused)) void * arg)
                  print_rte_event( 0, "event[i]",&events[i]);
                  printf(" Message:   %s\n",(char *)events[i].event_ptr);
                  
-                 printf("  c%d) Send message to next Port (aka core for me)  %d events\n",lcore_id,next_core[lcore_id]);
+                 printf("  c%d) Send message to next evt_queue (aka core for me)  %d queue\n",lcore_id,core_2_next_evt_queue_id[lcore_id]);
                  
                  // set to forward to next core.
-                 events[i].queue_id       = next_core[lcore_id];
+                 events[i].queue_id       = core_2_next_evt_queue_id[lcore_id];
                  // set operation to forward packet    
                  //  events[0].op             = RTE_EVENT_OP_FORWARD;
                  events[i].flow_id        += 1;
-                 events[i].event_ptr  = (void *)ethdev_message[lcore_id]; 
+                 events[i].event_ptr  = (void *)timer_message[lcore_id]; 
                  
                  rte_pause();
                  usleep(500000);     
-                 
-                 
-
-
 
                  ret = rte_event_enqueue_burst(event_dev_id, port_id,
                                      &(events[i]) , 1);
@@ -678,8 +688,37 @@ int timer_loop( __attribute__((unused)) void * arg)
                       rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
                  }
             }
-            else
+            if( events[i].event_type == RTE_EVENT_TYPE_TIMER )
+            {     
+ 
+                 printf("****    c%d) Received %d events **** \n",lcore_id,nb_rx);
+                 print_rte_event( 0, "event[i]",&events[i]);
+                 printf(" Message:   %s\n", timer_message[core_2_message [lcore_id] ] );
+                 
+                 printf("  c%d) Send timer message to  next evt_queue (aka core for me)  %d queue\n",lcore_id,core_2_next_evt_queue_id[lcore_id]);
+ 
+                 p_ev_timer = events[i].event_ptr;
+                 // set to forward to next core.
+                 p_ev_timer->ev.queue_id    = core_2_next_evt_queue_id[lcore_id];
+                 // set operation to forward packet    
+                 //  p_ev_timer->ev.op             = RTE_EVENT_OP_FORWARD;
+                 p_ev_timer->ev.flow_id        += 1;
+                 
+
+                 ret = rte_event_enqueue_burst(event_dev_id, port_id,
+                                     &(events[i]) , 1);
+                 if( ret != 1 )
+                 {
+                      printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
+                      printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
+                      rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
+                 }
+            }
+ 
+
+            else if (events[i].event_type == RTE_EVENT_TYPE_ETHDEV )  // event -> etherent packet
             {
+
 //<FS>
                  core_counter--;
                  // only fall in if p_print_interval is >0 else do not print
@@ -706,13 +745,10 @@ int timer_loop( __attribute__((unused)) void * arg)
 
                  if ( g_drop_all_traffic  == 1)
                  {
-                       
                        rte_pktmbuf_free( events[i].mbuf  );
                  }
                  else
                  {
-
-
 #ifdef LOOP_CALLS
                      CALL_RTE("rte_event_eth_tx_adapter_enqueue()");
 #endif
@@ -724,6 +760,17 @@ int timer_loop( __attribute__((unused)) void * arg)
                  }    
 
             } // end event - packet
+            else
+            {
+                  printf("  c%d) unrecognized event  %d \n",lcore_id,events[i].event_type);
+                  printf("  THIS IS A BUG, NOT SURE WHAT TO DO.\n");
+                  print_rte_event(0,"unrecognized event",&events[i] );
+
+                  //  rte_pktmbuf_free( events[i].mbuf  );
+            } // unrecognized event type.  
+
+
+
         }   // end for i -> nb_events 
     }  // end while
     return 0;
@@ -779,7 +826,7 @@ Close an event device. The device cannot be restarted! */
      return 0;
 }
 
-void  ethdev_description(void)
+void  timer_description(void)
 {
     printf(" \"ethdev\" - try to set up event mode with event_ethdev to pass traffic\n");
     printf("                in and out of board.  Later add RSS to spread acroos \n");
@@ -788,16 +835,14 @@ void  ethdev_description(void)
 
 
 
-struct test_mode_struct  tm_time = {
-      .setup         = time_setup,
-      .main_loop     = time_loop,
-      .print_results = time_print,
-      .cleanup       = time_cleanup,
-      .description   = time_description,
+struct test_mode_struct  tm_timer = {
+      .setup         = timer_setup,
+      .main_loop     = timer_loop,
+      .print_results = timer_print,
+      .cleanup       = timer_cleanup,
+      .description   = timer_description,
 };
 
-
-#endif
 
 
 

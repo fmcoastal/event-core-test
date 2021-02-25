@@ -43,7 +43,6 @@
  #endif
 
  ************************************/
- void Initialize_EventDev(void);
  void Initialize_EventDev(void)
  {
  int     result;
@@ -395,7 +394,6 @@
 //////
 //////  So we have n cores.   For this app, I want 1 core to have 1 port and 1 queue.
 /////                         we will use the Index to be the Index of the core??
-void start_event_dev(void);
 void start_event_dev(void)
    {
         int32_t ret;

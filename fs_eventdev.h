@@ -3,6 +3,10 @@
 
 
 
+extern const char * StringSched[];   //should be moved from fscore.c to here
+
+
+
 // structures to configure varaious 
 
 
@@ -141,6 +145,7 @@ void  print_rte_event_dev_info(int indent,const char* string, struct rte_event_d
 #endif
 
 
-
+ void Initialize_EventDev(void);
+ void start_event_dev(void);
 
 #endif
