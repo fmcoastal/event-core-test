@@ -16,35 +16,26 @@ else
    RUN_CODE=$1
 fi
 
-if [ "$RUN_CODE" == "0" ] ; then
-       echo "cmd 0"
-   ./build/core_test_app -c 0x0f -n 4  -- -t 0
-
-elif [ "$RUN_CODE" == "1" ] ; then
-       echo "Spin-lock test"
-   ./build/core_test_app -c 0x0f -n 4  -- -t 1
-
-elif  [ "$RUN_CODE" == "2" ] ; then
-       echo "cmd 2"
-   ./build/core_test_app -c 0x0f -n 4  -- -t 2
-
-elif  [ "$RUN_CODE" == "3" ] ; then
-       echo "cmd 3"
-   ./build/core_test_app -c 0x0f -n 4  -- -t 3
-
-elif  [ "$RUN_CODE" == "4" ] ; then
-       echo "Longest Prefix match test code cmd 4"
-   ./build/core_test_app -c 0x0f -n 4  -- -t 4
 
 
-elif [ "$RUN_CODE" == "5" ] ; then
-# code to pass messages from one core to the next
+########################################################################################################
+# 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 
+########################################################################################################
+if  [ "$RUN_CODE" == "8" ] ; then
+./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:04:00.0 -w 0002:05:00.0   –log-level=’pmd.crypto.octeontx2,8’  -- -t 8  -p 1000000
 
-# ./build/core_test_app -c 0x0f --log-level otx2_logtype_sso:debug -- -t 5
-# ./build/core_test_app -c 0x0f -- -t 5
-   ./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768 -w 0002:04:00.0 -w 0002:05:00.0    -- -t 5
-# ./build/core_test_app -c 0x0f  -w 0002:0e:00.0,xae_cnt=32768  --log-level otx2_logtype_sso:debug -- -t 5
+########################################################################################################
+# 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7
+########################################################################################################
+elif  [ "$RUN_CODE" == "7" ] ; then
 
+
+./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:04:00.0 -w 0002:05:00.0   –log-level=’pmd.crypto.octeontx2,8’  -- -t 7  -p 1000000
+# ./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:06:00.0 -w 0002:07:00.0   –log-level=’pmd.crypto.octeontx2,8’  -- -t 7 -m  -p 1
+
+########################################################################################################
+#  6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6  6 6 6 6 6 
+########################################################################################################
 elif  [ "$RUN_CODE" == "6" ] ; then
 
 # https://doc.dpdk.org/guides/cryptodevs/octeontx2.html
@@ -67,11 +58,39 @@ elif  [ "$RUN_CODE" == "6" ] ; then
 # https://doc.dpdk.org/guides/cryptodevs/
 # http://doc.dpdk.org/guides/prog_guide/rte_security.html 
 
-elif  [ "$RUN_CODE" == "7" ] ; then
+########################################################################################################
+#   5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5
+########################################################################################################
+elif [ "$RUN_CODE" == "5" ] ; then
+# code to pass messages from one core to the next
+
+# ./build/core_test_app -c 0x0f --log-level otx2_logtype_sso:debug -- -t 5
+# ./build/core_test_app -c 0x0f -- -t 5
+   ./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768 -w 0002:04:00.0 -w 0002:05:00.0    -- -t 5
+# ./build/core_test_app -c 0x0f  -w 0002:0e:00.0,xae_cnt=32768  --log-level otx2_logtype_sso:debug -- -t 5
 
 
-./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:04:00.0 -w 0002:05:00.0   –log-level=’pmd.crypto.octeontx2,8’  -- -t 7  -p 1000000
-# ./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:06:00.0 -w 0002:07:00.0   –log-level=’pmd.crypto.octeontx2,8’  -- -t 7 -m  -p 1
+
+elif [ "$RUN_CODE" == "0" ] ; then
+       echo "cmd 0"
+   ./build/core_test_app -c 0x0f -n 4  -- -t 0
+
+elif [ "$RUN_CODE" == "1" ] ; then
+       echo "Spin-lock test"
+   ./build/core_test_app -c 0x0f -n 4  -- -t 1
+
+elif  [ "$RUN_CODE" == "2" ] ; then
+       echo "cmd 2"
+   ./build/core_test_app -c 0x0f -n 4  -- -t 2
+
+elif  [ "$RUN_CODE" == "3" ] ; then
+       echo "cmd 3"
+   ./build/core_test_app -c 0x0f -n 4  -- -t 3
+
+elif  [ "$RUN_CODE" == "4" ] ; then
+       echo "Longest Prefix match test code cmd 4"
+   ./build/core_test_app -c 0x0f -n 4  -- -t 4
+
 
 
 
