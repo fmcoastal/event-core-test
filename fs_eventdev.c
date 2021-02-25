@@ -21,7 +21,6 @@
 
 
 
-#if 1
  //void print_event_queue_cfg
 
  /**********************************
@@ -387,7 +386,6 @@
 
  }   // end  void Initialize_EventDev(void);
 
-#endif
 
 
 
