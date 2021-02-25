@@ -18,6 +18,7 @@ SRCS-y += fs_print_rte_mbuff.c
 SRCS-y += fs_eventdev_timer.c
 SRCS-y += fs_global_vars.c
 SRCS-y += fs_net_common.c
+SRCS-y += fs_test.c
 
 
 # Build using pkg-config variables if possible

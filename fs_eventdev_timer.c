@@ -65,6 +65,21 @@
 
 #include "fs_global_vars.h"
 
+char  adapter_clk_sources[6][64]={"RTE_EVENT_TIMER_ADAPTER_CPU_CLK",
+                                "RTE_EVENT_TIMER_ADAPTER_EXT_CLK0", 
+                                "RTE_EVENT_TIMER_ADAPTER_EXT_CLK1", 
+                                "RTE_EVENT_TIMER_ADAPTER_EXT_CLK2", 
+                                "RTE_EVENT_TIMER_ADAPTER_EXT_CLK3",
+                                "Illegal_Value"} ; 
+
+char * get_clk_src( int v);
+char * get_clk_src( int v)
+{
+   if( (v  > 4)||  ( v < 0 )) return (adapter_clk_sources[4]);
+   return adapter_clk_sources[v];
+}
+
+
 //#include "fs_print_rte_structures.h"
 
 extern uint64_t  g_core_messages;
@@ -154,6 +169,8 @@ void timer_description( void);
 /////   - must have event dev setup here.
 
 // https://doc.dpdk.org/guides/prog_guide/event_timer_adapter.html?highlight=rte_event_timer
+// "app/test/test_event_timer_adapter.c" 
+
 void  timer_event_init(void);
 void  timer_event_init(void)
 {
@@ -161,7 +178,9 @@ void  timer_event_init(void)
     struct rte_event_timer_adapter_info  timer_adapter_info;
     uint32_t caps = 0;
     int ret = 0;
-    uint8_t flags = RTE_EVENT_TIMER_ADAPTER_F_ADJUST_RES;
+    uint8_t flags ;
+    flags = RTE_EVENT_TIMER_ADAPTER_F_ADJUST_RES;
+//    flags = 0;
 
 
     //  create an event timer adapter instance
@@ -170,11 +189,11 @@ struct rte_event_timer_adapter_conf time_adapter_config = {
      .timer_adapter_id    = 0,
      .socket_id           = rte_socket_id(),    // numa socket
      .clk_src             = RTE_EVENT_TIMER_ADAPTER_CPU_CLK,
-     .timer_tick_ns       = NSECPERSEC / 10,    // 100 milliseconds
-     .max_tmo_ns          = 180 * NSECPERSEC,   // 2 minutes
+     .timer_tick_ns       = 1E7,                  // 10ms  
+     .max_tmo_ns          = 1E9,                  // 1 sec   
      .nb_timers           = 4000,                 // fs reduced from 40000 to 40
      .flags               = flags
-};
+    };
 
     WAI();
 
@@ -195,6 +214,10 @@ struct rte_event_timer_adapter_conf time_adapter_config = {
          printf(" Did you bind a timer event to pci-vfio and is it listed in dpdk args? \n");
          rte_panic("Cannot init timer_adapter: rte_event_timer_adapter_create()   \n");
     }
+    else
+    {
+         printf(" successfully created timer_adapter  %p \n", g_glob.timer_100ms);
+    }
     // Call rte_event_timer_adapter_get_info()  to get this timer's
     //     min_resolution_ns
     //    max_tmo_ns
@@ -205,7 +228,6 @@ struct rte_event_timer_adapter_conf time_adapter_config = {
     print_rte_event_timer_adapter_info ( 0 , "timer_adapter_info" , 0 , &timer_adapter_info);
 
     return;
-
 }
 
 
@@ -213,6 +235,7 @@ void      timer_event_start(void);
 void      timer_event_start(void)
 {
    WAI();
+rte_event_timer_adapter_start( g_glob.timer_100ms);
 }
 
 
@@ -456,6 +479,7 @@ int timer_setup( __attribute__((unused)) void * arg)
 /////
 
     timer_event_init();
+    timer_event_start();
 
     return 0;
 }
@@ -487,7 +511,6 @@ int timer_loop( __attribute__((unused)) void * arg)
 //    size_t sent = 0, received = 0;
 
     uint8_t event_dev_id ;
-    uint8_t port_id ;
    
     struct rte_event events[BATCH_SIZE];
     uint16_t nb_rx; 
@@ -503,10 +526,6 @@ int timer_loop( __attribute__((unused)) void * arg)
 
     lcore_id   = rte_lcore_id();      // my core index
     event_dev_id     = g_glob.event_dev_id;   // id of my event device
-    port_id    = lcore_id;            // I have 1 port associated with 1 core.  
-                                      //   problem here could be lcore 19,20,21,22 
-                                      //           does not map port index 0,1,2,3 
-
 
      if( ! ( rte_lcore_is_enabled(20)  &&
              rte_lcore_is_enabled(21)  &&
@@ -525,10 +544,10 @@ int timer_loop( __attribute__((unused)) void * arg)
      {
         printf("*** Put an event into the Event Dev Scheduler ***\n");
 
-        printf("        event_dev_id: %d \n ",event_dev_id);
-        printf("        port_id: %d \n ",port_id);
-        printf("        lcore_id: %d \n ",lcore_id);
-        printf("        print every : %ldth  \n ",g_print_interval);
+        printf("        event_dev_id:  %d \n ",event_dev_id);
+        printf("        event_port_id: %d \n ",event_port_id);
+        printf("        lcore_id:      %d \n ",lcore_id);
+        printf("        print every :  %ldth  \n ",g_print_interval);
 
 
 #ifdef ENABLE_CORE_MESSAGES
@@ -582,11 +601,12 @@ int timer_loop( __attribute__((unused)) void * arg)
       //g_ev_timer.ev.rsvd           =  ;                      // uint8_t rsvd:4;
       g_ev_timer.ev.sched_type     = RTE_SCHED_TYPE_PARALLEL ;       // uint8_t  sched_type:2;
       g_ev_timer.ev.queue_id       = 0 ;                             // uint8_t  queue_id; event queue message will be placed in
-      g_ev_timer.ev.priority       = 0x40 ;                    // uint8_t  priority;
+      g_ev_timer.ev.priority       = 0x80 ;                    // uint8_t  priority;
       //g_ev_timer.ev.impl_opaque    =  ; // uint8_t  impl_opaque;
 
       g_ev_timer.ev.event_ptr  = (void *) &g_ev_timer ;  // set the second 64 bits to point this event structure
 
+      p_ev_timer = &g_ev_timer;
 
 
 #ifdef PRINT_CALL_ARGUMENTS
@@ -595,8 +615,8 @@ int timer_loop( __attribute__((unused)) void * arg)
       FONT_NORMAL();
 #endif
       print_rte_event_timer ( 1, "g_ev_timer",&(g_ev_timer));
-      CALL_RTE("rte_event_enqueue_burst() ");
-      ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id]  ,&g_ev_timer.ev  , 1 );
+      CALL_RTE("rte_event_timer_arm_burst() ");
+      ret = rte_event_timer_arm_burst( g_glob.timer_100ms , &p_ev_timer, 1 );
       if( ret != 1 )
       {
            printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
@@ -615,7 +635,7 @@ int timer_loop( __attribute__((unused)) void * arg)
        // lots of handwaving here.  there should be only one event 
        //    put in before the Event loop
  
-        nb_rx = rte_event_dequeue_burst(event_dev_id, port_id,
+        nb_rx = rte_event_dequeue_burst(event_dev_id, event_port_id,
                                 events, RTE_DIM(events), 0);
 
         if (nb_rx == 0) 
@@ -644,7 +664,7 @@ int timer_loop( __attribute__((unused)) void * arg)
                  rte_pause();
                  usleep(500000);     
 
-                 ret = rte_event_enqueue_burst(event_dev_id, port_id,
+                 ret = rte_event_enqueue_burst(event_dev_id, event_port_id,
                                      &(events[i]) , 1);
                  if( ret != 1 )
                  {
@@ -664,14 +684,15 @@ int timer_loop( __attribute__((unused)) void * arg)
  
                  p_ev_timer = events[i].event_ptr;
                  // set to forward to next core.
+                 p_ev_timer->state          = RTE_EVENT_TIMER_NOT_ARMED;
                  p_ev_timer->ev.queue_id    = core_2_next_evt_queue_id[lcore_id];
                  // set operation to forward packet    
                  //  p_ev_timer->ev.op             = RTE_EVENT_OP_FORWARD;
                  p_ev_timer->ev.flow_id        += 1;
-                 
+                
 
-                 ret = rte_event_enqueue_burst(event_dev_id, port_id,
-                                     &(events[i]) , 1);
+                 ret= rte_event_timer_arm_burst( g_glob.timer_100ms , &p_ev_timer, 1 ); 
+
                  if( ret != 1 )
                  {
                       printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
@@ -695,7 +716,7 @@ int timer_loop( __attribute__((unused)) void * arg)
                      core_counter = g_print_interval;
                      p_mbuff = events[i].mbuf;
 
-                     printf("%d< got packet  Stream  flow_id: 0x%05x  queue_id: %d, port_id %d\n",lcore_id,events[i].flow_id,events[i].queue_id,port_id );
+                     printf("%d< got packet  Stream  flow_id: 0x%05x  evt_queue_id: %d, evt_port_id %d\n",lcore_id,events[i].flow_id,events[i].queue_id,event_port_id );
                      if(g_verbose > 3)
                      {
                          buf = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
@@ -718,7 +739,7 @@ int timer_loop( __attribute__((unused)) void * arg)
                      CALL_RTE("rte_event_eth_tx_adapter_enqueue()");
 #endif
                      while (!rte_event_eth_tx_adapter_enqueue(event_dev_id,
-                                                              port_id,
+                                                              event_port_id,
                                                     &(events[i]), 1, 0) &&
                                                    ( g_force_quit != true ) ) 
                                      ;
@@ -819,15 +840,16 @@ void print_rte_event_timer_adapter_conf  (int indent,const char* string,int id,s
     INDENT(indent);
     FONT_DATA_STRUCTURES_COLOR();
 
-    printf("%sstruct rte_event_timer_adapter_conf %s %d\n",s,string,id);
+    printf("%sstruct rte_event_timer_adapter_conf %s id=%d  addr:%p  {\n",s,string,id,p);
     printf("%s    uint8_t   event_dev_id                 :  %d\n",s,p->event_dev_id );
     printf("%s    uint16_t  timer_adapter_id             :  %d\n",s,p->timer_adapter_id );
     printf("%s    uint32_t  socket_id                    :  %d\n",s,p->socket_id  );
-    printf("%s    enum rte_event_timer_adapter clk_src   :  %d\n",s,p->clk_src  );
+    printf("%s    enum rte_event_timer_adapter clk_src   :  %d   %s \n",s,p->clk_src,get_clk_src(p->clk_src)  );
     printf("%s    uint64_t  timer_tick_ns                :  %ld\n",s,p->timer_tick_ns  );
     printf("%s    uint64_t  max_tmo_ns                   :  %ld\n",s,p->max_tmo_ns  );
     printf("%s    uint64_t  nb_timers                    :  %ld\n",s,p->nb_timers  );
     printf("%s    uint64_t  flags                        :  %ld\n",s,p->flags  );
+    printf("%s}\n",s );
     FONT_NORMAL();
 }
 #else
@@ -844,12 +866,13 @@ void print_rte_event_timer_adapter_info   (int indent,const char* string,int id,
     INDENT(indent);
     FONT_DATA_STRUCTURES_COLOR();
 
-    printf("%sstruct rte_event_timer_adapter_info  %s %d\n",s,string,id);
-    printf("%s    uint64_t      min_resolution_ns         %ld\n",s,p->min_resolution_ns  );
-    printf("%s    uint64_t      max_tmo_ns                %ld\n",s,p->max_tmo_ns  );
+    printf("%sstruct rte_event_timer_adapter_info  %s id=%d  addr:%p {\n",s,string,id,p );
+    printf("%s   uint64_t      min_resolution_ns         %ld\n",s,p->min_resolution_ns  );
+    printf("%s   uint64_t      max_tmo_ns                %ld\n",s,p->max_tmo_ns  );
     print_rte_event_timer_adapter_conf( indent+1, "conf ",0,&(p->conf));
-    printf("%s    uint32_t      caps                      %d\n",s,p->caps  );
-    printf("%s    int16_t       event_dev_port_id                 %d\n",s,p->event_dev_port_id  );
+    printf("%s   uint32_t      caps                      %d\n",s,p->caps  );
+    printf("%s   int16_t       event_dev_port_id     %d\n",s,p->event_dev_port_id  );
+    printf("%s}\n",s );
     FONT_NORMAL();
 }
 
