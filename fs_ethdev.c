@@ -1409,8 +1409,6 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 
 
 
-
-
 // INFO
    printf("rte_event_dev_count() = %d \n",rte_event_dev_count());
    printf("rte_eth_dev_count_avail() = %d \n",rte_eth_dev_count_avail());
@@ -1580,7 +1578,6 @@ int ethdev_loop( __attribute__((unused)) void * arg)
 
     if( (lcore_id == 20 )  && ( g_core_messages == 1))
     {
-        
         // cmd line option to send inter-core operations
  
         printf("*** Put an event into the Event Dev Scheduler ***\n");
@@ -1607,7 +1604,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
         g_ev.priority       = 0x40;                     // uint8_t  priority;  (priority assigned to event queue )
         //g_ev.impl_opaque    =  ; // uint8_t  impl_opaque;
         g_ev.event_ptr  = (void *) (ethdev_message[core_2_message[ lcore_id ] ]) ;  // set the second 64 bits to point at a payload
-     
+
      
 #ifdef PRINT_CALL_ARGUMENTS
         FONT_CALL_ARGUMENTS_COLOR();
@@ -1696,7 +1693,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                  print_rte_event( 0, "event[i]",&events[i]);
                  printf(" Message:   %s\n",(char *)events[i].event_ptr);
                  
-                 printf("  c%d) Send message to next Port (aka core for me)  port_id: %d \n",lcore_id
+                 printf("  c%d) Send message to next Port (aka core for me)  next_queue: %d \n",lcore_id
                                                          ,core_2_next_evt_port_id[lcore_id]);
                  
                  // set to forward to next core.
@@ -1753,9 +1750,11 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                          buf = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
                          PrintBuff((uint8_t*) buf, 0x40 , NULL ,"mbuff Raw Buffer");
                      }
-                     
-                     PrintBuff((uint8_t*) p_mbuff, (0x100 + p_mbuff->pkt_len + 0x10) , NULL ,"mbuff Raw Buffer");
-                     print_rte_mbuf(0,p_mbuff);
+                      if(g_verbose > 3)
+                     {
+                         PrintBuff((uint8_t*) p_mbuff, (0x100 + p_mbuff->pkt_len + 0x10) , NULL ,"mbuff Raw Buffer");
+                         print_rte_mbuf(0,p_mbuff);
+                     }
                  }
 //<FS>
                  if ( g_drop_all_traffic  == 1)
