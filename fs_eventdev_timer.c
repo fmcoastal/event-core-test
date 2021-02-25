@@ -147,17 +147,13 @@ int        timer_print( __attribute__((unused))void * arg);
 int      timer_cleanup( __attribute__((unused))void * arg);
 void timer_description( void);
 
-
-
-
 /////
 /////
 /////  Configer event_timer  hw.
 /////
 /////   - must have event dev setup here.
 
-
-
+// https://doc.dpdk.org/guides/prog_guide/event_timer_adapter.html?highlight=rte_event_timer
 void  timer_event_init(void);
 void  timer_event_init(void)
 {
@@ -165,6 +161,8 @@ void  timer_event_init(void)
     struct rte_event_timer_adapter_info  timer_adapter_info;
     uint32_t caps = 0;
     int ret = 0;
+    uint8_t flags = RTE_EVENT_TIMER_ADAPTER_F_ADJUST_RES;
+
 
     //  create an event timer adapter instance
 struct rte_event_timer_adapter_conf time_adapter_config = {
@@ -174,8 +172,8 @@ struct rte_event_timer_adapter_conf time_adapter_config = {
      .clk_src             = RTE_EVENT_TIMER_ADAPTER_CPU_CLK,
      .timer_tick_ns       = NSECPERSEC / 10,    // 100 milliseconds
      .max_tmo_ns          = 180 * NSECPERSEC,   // 2 minutes
-     .nb_timers           = 40,                 // fs reduced from 40000 to 40
-     .flags               = 0
+     .nb_timers           = 4000,                 // fs reduced from 40000 to 40
+     .flags               = flags
 };
 
     WAI();
@@ -236,13 +234,13 @@ int timer_setup( __attribute__((unused)) void * arg)
          g_glob.def_p_conf.new_event_threshold = -1;
 
     // event queues & ports
-    g_glob.evq.nb_queues = 8 ;  // total number of event queues in my design
+    g_glob.evq.nb_queues = 4 ;  // total number of event queues in my design
     g_glob.evp.nb_ports  = 4 ;  // total number of event ports in my design.  
 
 
     // adapters rx & tx
-    g_glob.rx_adptr.nb_rx_adptr = 2 ;  // total number of rx_adapters in my design
-    g_glob.tx_adptr.nb_tx_adptr = 2 ;  // total number of tx_adapters in my design.  
+    g_glob.rx_adptr.nb_rx_adptr = 0 ;  // total number of rx_adapters in my design
+    g_glob.tx_adptr.nb_tx_adptr = 0 ;  // total number of tx_adapters in my design.  
 
 
 
@@ -303,7 +301,7 @@ int timer_setup( __attribute__((unused)) void * arg)
     ( ptr + 1 )->ev_q_conf.event_queue_cfg = RTE_EVENT_QUEUE_CFG_ALL_TYPES;
     ( ptr + 1 )->ev_q_conf.schedule_type = 0;  /*  dont care when   
                                             event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
-    ( ptr + 1 )->ev_q_conf.priority = 0x40;
+    ( ptr + 1 )->ev_q_conf.priority = 0x80;
 
 // queue 2
     ( ptr + 2 )->event_q_id    = 2;         // event queue index
@@ -319,39 +317,8 @@ int timer_setup( __attribute__((unused)) void * arg)
     ( ptr + 3 )->ev_q_conf.event_queue_cfg = RTE_EVENT_QUEUE_CFG_ALL_TYPES;
     ( ptr + 3 )->ev_q_conf.schedule_type = 0;  /*  dont care when   
                                             event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
-    ( ptr + 3 )->ev_q_conf.priority = 0x40;
+    ( ptr + 3 )->ev_q_conf.priority = 0x80;
 
-// queue 4
-    ( ptr + 4 )->event_q_id    = 4;         // event queue index
-    ( ptr + 4 )->to_event_port = 2;         // event port this queue feeds
-    ( ptr + 4 )->ev_q_conf.event_queue_cfg = RTE_EVENT_QUEUE_CFG_ALL_TYPES;
-    ( ptr + 4 )->ev_q_conf.schedule_type = 0;  /*  dont care when   
-                                            event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
-    ( ptr + 4 )->ev_q_conf.priority = 0x80;
-
-// queue 5
-    ( ptr + 5 )->event_q_id    = 5;         // event queue index
-    ( ptr + 5 )->to_event_port = 2;         // event port this queue feeds
-    ( ptr + 5 )->ev_q_conf.event_queue_cfg = RTE_EVENT_QUEUE_CFG_ALL_TYPES;
-    ( ptr + 5 )->ev_q_conf.schedule_type = 0;  /*  dont care when   
-                                            event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
-    ( ptr + 5 )->ev_q_conf.priority = 0x40;
-
-// queue 6
-    ( ptr + 6 )->event_q_id    = 6;         // event queue index
-    ( ptr + 6 )->to_event_port = 3;         // event port this queue feeds
-    ( ptr + 6 )->ev_q_conf.event_queue_cfg = RTE_EVENT_QUEUE_CFG_ALL_TYPES;
-    ( ptr + 6 )->ev_q_conf.schedule_type = 0;  /*  dont care when   
-                                            event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
-    ( ptr + 6 )->ev_q_conf.priority = 0x80;
-
-// queue 7
-    ( ptr + 7 )->event_q_id    = 7;         // event queue index
-    ( ptr + 7 )->to_event_port = 3;         // event port this queue feeds
-    ( ptr + 7 )->ev_q_conf.event_queue_cfg = RTE_EVENT_QUEUE_CFG_ALL_TYPES;
-    ( ptr + 7 )->ev_q_conf.schedule_type = 0;  /*  dont care when   
-                                            event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
-    ( ptr + 7 )->ev_q_conf.priority = 0x40;
 }
 
 
@@ -363,44 +330,36 @@ int timer_setup( __attribute__((unused)) void * arg)
 //       queues and the queue priority        
 
 
- // port 0  - two queues (0 and 1), queue Priority 0x80 and 0x40
-   (g_glob.evp.event_p_id + 0)->nb_links = 2;
+ // port 0  - one  queues (0 ), queue Priority 0x80 
+   (g_glob.evp.event_p_id + 0)->nb_links = 1;
    (g_glob.evp.event_p_id + 0)->q_id[0] = 0;
    (g_glob.evp.event_p_id + 0)->pri[0]  = 80;
-   (g_glob.evp.event_p_id + 0)->q_id[1] = 1;
-   (g_glob.evp.event_p_id + 0)->pri[1]  = 40;
  
- // port 1  - two queues (2 and 3), queue Priority 0x80 and 0x40
-   (g_glob.evp.event_p_id + 1)->nb_links = 2;
-   (g_glob.evp.event_p_id + 1)->q_id[0] = 2;
+ // port 1  - one queues (1), queue Priority 0x80 
+   (g_glob.evp.event_p_id + 1)->nb_links = 1;
+   (g_glob.evp.event_p_id + 1)->q_id[0] = 1;
    (g_glob.evp.event_p_id + 1)->pri[0]  = 80;
-   (g_glob.evp.event_p_id + 1)->q_id[1] = 3;
-   (g_glob.evp.event_p_id + 1)->pri[1]  = 40;
 
-  // port 2  - two queues (4 and 5), queue Priority 0x80 and 0x40
+  // port 2  - one queues (2), queue Priority 0x80
    (g_glob.evp.event_p_id + 2)->nb_links = 2;
-   (g_glob.evp.event_p_id + 2)->q_id[0] = 4;
+   (g_glob.evp.event_p_id + 2)->q_id[0] = 2;
    (g_glob.evp.event_p_id + 2)->pri[0]  = 80;
-   (g_glob.evp.event_p_id + 2)->q_id[1] = 5;
-   (g_glob.evp.event_p_id + 2)->pri[1]  = 40;
 
-  // port 3  - two queues (0 and 1), queue Priority 0x80 and 0x40
+  // port 3  - one queues (3), queue Priority 0x80
    (g_glob.evp.event_p_id + 3)->nb_links = 2;
-   (g_glob.evp.event_p_id + 3)->q_id[0] = 6;
+   (g_glob.evp.event_p_id + 3)->q_id[0] = 3;
    (g_glob.evp.event_p_id + 3)->pri[0]  = 80;
-   (g_glob.evp.event_p_id + 3)->q_id[1] = 7;
-   (g_glob.evp.event_p_id + 3)->pri[1]  = 40;
  
 
 
-
+#ifdef  ENABLE_ETHERNET  // no ethernet adapters
 // what is missing from below is portID to go with the queue_id
     g_glob.rx_adptr.rx_adptr[0]  = 0 ; //  rx_adapter 0 assigned to queue 0.
     g_glob.rx_adptr.rx_adptr[1]  = 0 ; //  rx_adapter 1 assigned to queue 0. what is missing here is port_id
 
     g_glob.tx_adptr.tx_adptr[0]  = 0 ; //  tx_adapter 0 assigned to queue 0.
     g_glob.tx_adptr.tx_adptr[1]  = 0 ; //  tx_adapter 1 assigned to queue 0.
-
+#endif
 
 
 // INFO
@@ -457,7 +416,7 @@ int timer_setup( __attribute__((unused)) void * arg)
 /////  Start the ethernet interfaces
 /////
 /////
-#if  0 
+#ifdef   ENABLE_ETHERNET 
      ethdev_start();
 
     {
@@ -490,9 +449,15 @@ int timer_setup( __attribute__((unused)) void * arg)
 
 #endif
 
+/////
+/////
+/////  Start timer events
+/////
+/////
 
+    timer_event_init();
 
-     return 0;
+    return 0;
 }
 
 
@@ -566,7 +531,7 @@ int timer_loop( __attribute__((unused)) void * arg)
         printf("        print every : %ldth  \n ",g_print_interval);
 
 
-#if 0
+#ifdef ENABLE_CORE_MESSAGES
        memset(&g_ev,0, sizeof(struct rte_event)); 
        g_ev.event=0;    // set event "union" fields to 0
        g_ev.event_ptr  = (void *) (timer_message[lcore_id]) ;  // set the second 64 bits to point at a payload
@@ -603,7 +568,7 @@ int timer_loop( __attribute__((unused)) void * arg)
       memset(&g_ev_timer,0, sizeof(struct rte_event_timer)); 
 
       g_ev_timer.state  =  RTE_EVENT_TIMER_NOT_ARMED;  // set this per documentation
-      g_ev_timer.timeout_ticks = 1000000000;         //time in ns (5 seconds for now)
+      g_ev_timer.timeout_ticks = 100;                  //time in ns (5 seconds for now)
       // g_ev_timer.impl_opaque[2] ;  per documentation, do not touch
       g_ev_timer.user_meta[0] = 0;                        // my application defined data
 
@@ -629,7 +594,7 @@ int timer_loop( __attribute__((unused)) void * arg)
       printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,lcore_id);
       FONT_NORMAL();
 #endif
-      print_rte_event( 1, "g_ev_timer.ev",&(g_ev_timer.ev));
+      print_rte_event_timer ( 1, "g_ev_timer",&(g_ev_timer));
       CALL_RTE("rte_event_enqueue_burst() ");
       ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id]  ,&g_ev_timer.ev  , 1 );
       if( ret != 1 )
@@ -893,5 +858,25 @@ void print_rte_event_timer_adapter_info   (int indent,const char* string,int id,
 #endif
 
 
+
+#ifdef PRINT_DATA_STRUCTURES
+void print_rte_event_timer  (int indent,const char* string,struct rte_event_timer *p)
+{
+    INDENT(indent);
+    FONT_DATA_STRUCTURES_COLOR();
+
+    printf("%sstruct rte_event_timer  %s  add:%p    { \n",s,string,p);
+    print_rte_event( indent+1 , "ev",&(p->ev));
+    printf("%s    enum      state                        :  %d\n",s,p->state );
+    printf("%s    uint64_t  timeout_ticks                :  %ld\n",s,p->timeout_ticks  );
+    printf("%s    uint64_t  impl_opaque[0]               :  %ld\n",s,p->impl_opaque[0]  );
+    printf("%s    uint64_t  impl_opaque[1]               :  %ld\n",s,p->impl_opaque[1]  );
+    printf("%s    uint8_t   user_meta[0]                 :  %d\n",s,p->user_meta[0] );
+    printf("%s} \n",s );
+    FONT_NORMAL();
+}
+#else
+#define print_rte_event_timer  (w,x,y,)
+#endif
 
 

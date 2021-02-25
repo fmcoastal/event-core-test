@@ -16,6 +16,8 @@ void  timer_event_init(void);
 
 void print_rte_event_timer_adapter_conf (int indent,const char* string,int id,struct rte_event_timer_adapter_conf *p);
 void print_rte_event_timer_adapter_info (int indent,const char* string,int id,struct rte_event_timer_adapter_info  *p);
+void print_rte_event_timer  (int indent,const char* string,struct rte_event_timer *p);
+
 
 
 

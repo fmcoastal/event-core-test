@@ -174,7 +174,7 @@ void usage(void)
                  g_tst_func  = tm_crypto;
          else if ( g_test_selection  == 7)
                  g_tst_func  = tm_ethdev;
-         else if ( g_test_selection  == 7)
+         else if ( g_test_selection  == 8)
                  g_tst_func  = tm_timer;
 
 

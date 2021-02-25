@@ -8,9 +8,10 @@ if [ "$1" == "" ] ; then
    echo " test 2:  ???  "
    echo " test 3:  ???  "
    echo " test 4:  Longest prefix match test code "
-   echo " test 5:  event dev, moce message to next core   "
-   echo " test 6:  event crypto  "
-   echo " test 7:  event ethdev  "
+   echo " test 5:  event dev,  message to next core   "
+   echo " test 6:  event dev crypto  "
+   echo " test 7:  event dev ethdev  "
+   echo " test 8:  event dev timer  "
    exit
 else
    RUN_CODE=$1
@@ -22,7 +23,7 @@ fi
 # 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 
 ########################################################################################################
 if  [ "$RUN_CODE" == "8" ] ; then
-./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:04:00.0 -w 0002:05:00.0   –log-level=’pmd.crypto.octeontx2,8’  -- -t 8  -p 1000000
+./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:04:00.0 -w 0002:05:00.0   –log-level=’pmd.crypto.octeontx2,8’  -- -t 8  -m  -p 1000000
 
 ########################################################################################################
 # 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7

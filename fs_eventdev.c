@@ -474,7 +474,7 @@ void print_rte_event(int indent,const char * string,struct rte_event *p)
   INDENT(indent);
   FONT_DATA_STRUCTURES_COLOR();
 
-  printf("%sstruct rte_event: %s  \n",s,string);
+  printf("%sstruct rte_event: %s  address: %p \n",s,string,p);
   printf("%s    uint32_t    flow_id:20          0x%x \n" ,s,p->flow_id         );
   printf("%s    uint32_t    sub_event_type:8    0x%x \n" ,s,p->sub_event_type  );
   printf("%s    uint32_t    event_type:4        0x%x  -%s \n" ,s,p->event_type,event_type_string[p->event_type]);

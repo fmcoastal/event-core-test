@@ -114,24 +114,24 @@ void print_rte_mbuf(int indent, struct rte_mbuf *m)
 
 //    m->tx_offload=0xdeadbeef;
 
-    printf("%s struct rte_mbuf:  %p { \n"  ,s,m);
+    printf("%s struct rte_mbuf:  address:%p { \n"  ,s,m);
 
     printf("%s   (void *)   buf_addr:       0x%p      offset:0x%lx \n",s,m->buf_addr   ,offsetof(struct rte_mbuf, buf_addr));
-    printf("%s   (uint16_t) refcnt          0x%04x             offset:0x%lx \n",s,m->refcnt     ,offsetof(struct rte_mbuf, refcnt));
-    printf("%s   (uint16_t) nb_segs         0x%04x             offset:0x%lx \n",s,m->nb_segs    ,offsetof(struct rte_mbuf,nb_segs ));
-    printf("%s   (uint16_t) port            0x%04x             offset:0x%lx \n",s,m->port       ,offsetof(struct rte_mbuf,port ));
+    printf("%s   (uint16_t) refcnt          0x%04x              offset:0x%lx \n",s,m->refcnt     ,offsetof(struct rte_mbuf, refcnt));
+    printf("%s   (uint16_t) nb_segs         0x%04x              offset:0x%lx \n",s,m->nb_segs    ,offsetof(struct rte_mbuf,nb_segs ));
+    printf("%s   (uint16_t) port            0x%04x              offset:0x%lx \n",s,m->port       ,offsetof(struct rte_mbuf,port ));
     printf("%s   (uint64_t) ol_flags        0x%016lx  offset:0x%lx \n"         ,s,m->ol_flags   ,offsetof(struct rte_mbuf,ol_flags ));
-    printf("%s   (uint32_t) pkt_len         0x%08x         offset:0x%lx \n"    ,s,m->pkt_len    ,offsetof(struct rte_mbuf,pkt_len ));
-    printf("%s   (uint16_t) data_len        0x%04x             offset:0x%lx \n",s,m->data_len   ,offsetof(struct rte_mbuf,data_len ));
-    printf("%s   (uint16_t) vlan_tci        0x%04x             offset:0x%lx \n",s,m->vlan_tci   ,offsetof(struct rte_mbuf,vlan_tci ));
-    printf("%s   (uint16_t) vlan_tci_outer  0x%04x             offset:0x%lx \n",s,m->vlan_tci_outer   ,offsetof(struct rte_mbuf,vlan_tci_outer ));
-    printf("%s   (uint16_t) buf_len         0x%04x             offset:0x%lx \n",s,m->buf_len    ,offsetof(struct rte_mbuf,buf_len ));
+    printf("%s   (uint32_t) pkt_len         0x%08x          offset:0x%lx \n"    ,s,m->pkt_len    ,offsetof(struct rte_mbuf,pkt_len ));
+    printf("%s   (uint16_t) data_len        0x%04x              offset:0x%lx \n",s,m->data_len   ,offsetof(struct rte_mbuf,data_len ));
+    printf("%s   (uint16_t) vlan_tci        0x%04x              offset:0x%lx \n",s,m->vlan_tci   ,offsetof(struct rte_mbuf,vlan_tci ));
+    printf("%s   (uint16_t) vlan_tci_outer  0x%04x              offset:0x%lx \n",s,m->vlan_tci_outer   ,offsetof(struct rte_mbuf,vlan_tci_outer ));
+    printf("%s   (uint16_t) buf_len         0x%04x              offset:0x%lx \n",s,m->buf_len    ,offsetof(struct rte_mbuf,buf_len ));
     printf("%s   (uint64_t) timestamp       0x%016lx  offset:0x%lx \n"         ,s,m->timestamp  ,offsetof(struct rte_mbuf,timestamp ));
     printf("%s   (struct rte_mempool*) pool 0x%p       offset:0x%lx \n"        ,s,m->pool       ,offsetof(struct rte_mbuf, pool));
     printf("%s   (struct rte_mbuf*) next    0x%p       offset:0x%lx \n"        ,s,m->next       ,offsetof(struct rte_mbuf, next));
-    printf("%s   (uint16_t) priv_size       0x%08x         offset:0x%lx \n",s,m->priv_size  ,offsetof(struct rte_mbuf,priv_size ));
-    printf("%s   (uint16_t) timesync        0x%08x         offset:0x%lx \n"    ,s,m->timesync   ,offsetof(struct rte_mbuf,timesync ));
-    printf("%s   (uint32_t) seqn            0x%08x         offset:0x%lx \n"    ,s,m->seqn       ,offsetof(struct rte_mbuf,seqn ));
+    printf("%s   (uint16_t) priv_size       0x%08x          offset:0x%lx \n",s,m->priv_size  ,offsetof(struct rte_mbuf,priv_size ));
+    printf("%s   (uint16_t) timesync        0x%08x          offset:0x%lx \n"    ,s,m->timesync   ,offsetof(struct rte_mbuf,timesync ));
+    printf("%s   (uint32_t) seqn            0x%08x          offset:0x%lx \n"    ,s,m->seqn       ,offsetof(struct rte_mbuf,seqn ));
     printf("%s   (struct rte_mbuf_ext_shared_info *) shinfo 0x%p\n",s,m->shinfo);
 
     printf("%s   (uint64_t) dynfield1[0]           0x%016lx\n",s,m->dynfield1[0]);
