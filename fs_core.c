@@ -501,6 +501,57 @@ uint32_t event_queue_cfg = 0;
 }
 
 
+
+
+
+// Stuff the event structure with the values I want
+// and make it cleaner for other tests to generate timer events.
+//   NOTE+ by default, I set op= RTE_EVENT_OP_NEW
+ struct rte_event * gen_ev( struct rte_event * p_ev,
+                                        uint32_t flow_id,
+                                        uint8_t  sched_type,
+                                        uint8_t  evt_queue,
+                                        uint8_t  evt_queue_priority,
+                                        void *   evt_ptr)
+{
+     if( p_ev == NULL)
+     {
+         printf( " ERROR-- I DO NOT TAKE NULL AT THIS TIME %s\n",__FILE__);
+         // future, allocate a structure from heap or pool.
+     }
+     memset(p_ev,0, sizeof(struct rte_event));
+
+    // In order to get sso to deliver, I have to add the following to the WQE
+    // p_ev->ev.event=0;    // set event "union" fields to 0
+
+    p_ev->flow_id        = flow_id;                // uint32_t flow_id:20;
+    p_ev->sub_event_type = RTE_EVENT_TYPE_CPU   ;  // uint32_t sub_event_type:8;
+    p_ev->event_type     = RTE_EVENT_TYPE_CPU   ;  // uint32_t event_type:4;
+    p_ev->op             = RTE_EVENT_OP_NEW;       // uint8_t op:2; NEW,FORWARD or RELEASE
+    //p_ev->ev.rsvd           =  ;                     // uint8_t rsvd:4;
+    p_ev->sched_type     = sched_type;             // uint8_t  sched_type:2;  RTE_SCHED_TYPE_PARALLEL
+    p_ev->queue_id       = evt_queue ;             // uint8_t  queue_id; event queue message will be placed in
+    p_ev->priority       = evt_queue_priority ;    // uint8_t  priority;
+    //p_evr->impl_opaque    =  ;                    // uint8_t  impl_opaque;
+
+    p_ev->event_ptr  = (void *) evt_ptr ;      // set the second 64 bits to point this event structure
+
+    return p_ev;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+struct rte_event   g_ev;
+
 #define LOCK_LOOPS (10*10)
 #define BATCH_SIZE  4
 
@@ -508,27 +559,28 @@ char  m0[] = { "Eat"        };
 char  m1[] = { "At"         };
 char  m2[] = { "Joes"       };
 char  m3[] = { "Bar & Grill"};
-char * message[] = {m0,m1,m2,m3};
+char * core_message[] = {m0,m1,m2,m3};
 
 
 int core_loop( __attribute__((unused)) void * arg)
 {
     unsigned lcore_id;
 //    int  i;
-    struct rte_event   ev;
     uint8_t event_dev_id ;
     uint8_t event_port_id ;
-   
-    struct rte_event events[BATCH_SIZE];
+    struct rte_event  * p_ev;
+ 
     uint16_t nb_rx;
+    uint16_t i;
+    struct rte_event events[BATCH_SIZE];
+
+    uint16_t ret;
     // because my event device is 1 core to 1 port to 1 queue,  the table below is a
     //     a simple bit ot  
     uint8_t  core_2_message[]       = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,1,2,3 };
     uint8_t  core_2_next_message[]  = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 1,2,3,0 };
     uint8_t  core_2_evt_port_id[]       = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,1,2,3 };
-    uint8_t  core_2_next_evt_port_id[]  = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 1,2,3,0 };
     uint8_t  core_2_next_evt_queue_id[] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 1,2,3,0 };
-    uint16_t ret;
 
     if( ! ( rte_lcore_is_enabled(20)  && 
             rte_lcore_is_enabled(21)  &&
@@ -552,32 +604,27 @@ int core_loop( __attribute__((unused)) void * arg)
         printf("        event_dev_id:  %d \n",event_dev_id);
         printf("        event_port_id: %d \n",event_port_id);
         printf("        lcore_id:      %d \n",lcore_id);
-     
-        memset(&ev,0, sizeof(struct rte_event)); 
-        ev.event=0;    // set "event union" to 0
-        // sorry about the message mapping, but necessary if cores enabled do not start at 0
 
-// In order to get sso to deliver, I had to add the following to the WQE
-        ev.flow_id        = 0xDEAD;                 // uint32_t flow_id:20;
-        ev.sub_event_type = RTE_EVENT_TYPE_CPU ;    // uint32_t sub_event_type:8;
-        ev.event_type     = RTE_EVENT_TYPE_CPU ;    // uint32_t event_type:4;
-        ev.op             = RTE_EVENT_OP_NEW;                // uint8_t op:2; NEW,FORWARD or RELEASE
-        //ev.rsvd           =  ;                             // uint8_t rsvd:4;
-        ev.sched_type     = RTE_SCHED_TYPE_PARALLEL ;        // uint8_t  sched_type:2;
-        ev.queue_id       = 0 ; // uint8_t  queue_id;  (this is the id of the event_queue - mapped to the event port we need)
-//        ev.queue_id       = core_2_next_evt_queue_id[lcore_id] ; // uint8_t  queue_id;  (not sure if hw looks at this)
-        ev.priority       = RTE_EVENT_DEV_PRIORITY_NORMAL ;  // uint8_t  priority;
-        //ev.impl_opaque    =  ; // uint8_t  impl_opaque;
-        ev.event_ptr  = (void *) (message[core_2_message[lcore_id]]) ; // set the second 64 bits to point at a payload
+        p_ev = &g_ev;      
 
-        print_rte_event( 1,"ev",&ev);
+        // fill in my rte_event with the field data I need.  note- op=RTE_EVENT_OP_NEW 
+        p_ev = gen_ev( p_ev,                               /* struct rte_event * p_ev     */
+                       0xdead,                             /* uint32_t flow_id            */
+                       RTE_SCHED_TYPE_PARALLEL,            /* uint8_t  sched_type         */
+                       core_2_evt_port_id[lcore_id],       /* uint8_t  evt_queue          */
+                       RTE_EVENT_DEV_PRIORITY_NORMAL,      /* uint8_t  evt_queue_priority */
+                       (void *) core_message[core_2_message[lcore_id]] /* void *evt_ptr) */
+                       );
+
+        // printout what I created
+        print_rte_event( 1,"ev",p_ev);
 
 
-
-/* static uint16_t rte_event_enqueue_burst	(uint8_t dev_id, uint8_t port_id,
-                                       const struct rte_event ev[],uint16_t nb_events)	
-*/
-        ret = rte_event_enqueue_burst(event_dev_id, core_2_next_evt_port_id[lcore_id], &ev, 1 );
+/* static uint16_t rte_event_enqueue_burst (uint8_t dev_id, 
+                                            uint8_t port_id,
+                                            const struct rte_event ev[]
+                                            ,uint16_t nb_events)	  */
+        ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id], p_ev, 1 );
         if( ret != 1 )
         {
              printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
@@ -593,8 +640,8 @@ int core_loop( __attribute__((unused)) void * arg)
     printf(" Launch code on Core: %d\n",lcore_id);
     while (!g_force_quit)
     {
-       // lots of handwaving here.  there should be only one event 
-       //    put in before the Event loop
+        // lots of handwaving here.  there should be only one event 
+        //    put in before the Event loop
  
         nb_rx = rte_event_dequeue_burst(event_dev_id, event_port_id,
                                 events, RTE_DIM(events), 0);
@@ -604,36 +651,51 @@ int core_loop( __attribute__((unused)) void * arg)
             rte_pause();
             continue;
         }
-        printf("****    c%d) Received %d events **** \n",lcore_id,nb_rx);
-        print_rte_event(1, "event[0]",&events[0]);
-        printf(" Message:   %s\n",(char *)events[0].event_ptr);
-
-        printf("  c%d) Send message to next Port (aka core for me) port_id %d \n",lcore_id,core_2_evt_port_id[lcore_id]);
-
-        // set to forward to next core.
-        events[0].queue_id       = core_2_next_evt_queue_id[lcore_id] ;
-        // set operation to forward packet    
-        events[0].op             = RTE_EVENT_OP_FORWARD;  // this for some reason stops the event form forwarding
-        events[0].flow_id        += 1;
-        events[0].event_ptr  = (void *)message[core_2_next_message[lcore_id]]; 
-
- 
-        print_rte_event(1, " about to stuff this  event[0]",&events[0]);
-        rte_pause();
-        usleep(1000000);     
- 
-        ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id],
-                                events, nb_rx);
-        if( ret != 1 )
+        for(i = 0 ; i < nb_rx ; i++)
         {
-             printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
-             printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
-             rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
-        }
+            if( events[i].event_type == RTE_EVENT_TYPE_CPU )
+            {
+                printf("****    c%d) Received %d events **** \n",lcore_id,nb_rx);
+                print_rte_event(1, "event[0]",&events[0]);
+                printf(" Message:   %s\n",(char *)events[0].event_ptr);
+               
+                printf("  c%d) Send message to next Port (aka core for me) port_id %d \n",lcore_id,core_2_evt_port_id[lcore_id]);
+       
+                // set to forward to next core.
+                events[0].queue_id       = core_2_next_evt_queue_id[lcore_id] ;
+                // set operation to forward packet    
+                events[0].op             = RTE_EVENT_OP_FORWARD;  // this for some reason stops the event form forwarding
+                events[0].flow_id        += 1;
+                events[0].event_ptr  = (void *)core_message[core_2_next_message[lcore_id]]; 
+    
+        
+                print_rte_event(1, " about to stuff this  event[0]",&events[0]);
+                rte_pause();
+                usleep(1000000);     
+        
+                ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id],
+                                      events, nb_rx);
+                if( ret != 1 )
+                {
+                     printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
+                     printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
+                     rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
+                }
+    
+             } // end event - RTE_EVENT_TYPE_CPU
+             else
+             {
+    
+                  printf("  c%d) unrecognized event  %d \n",lcore_id,events[i].event_type);
+                  printf("  THIS IS A BUG, NOT SURE WHAT TO DO.\n");
+                  print_rte_event(0,"unrecognized event",&events[i] );
+      
+    
+             }  // end event - unrecognized
 
-//        if (lcore_id == 3) g_force_quit = true;
+       } // end nb_rx
 
-    }
+    } // end force quit
     return 0;
 }
 

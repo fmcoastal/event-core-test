@@ -230,8 +230,9 @@ struct rte_event_timer_adapter_conf time_adapter_config = {
     return;
 }
 
-
-void      timer_event_start(void);
+/////////////////////////////////////////////
+/////////////////////////////////////////////
+/////////////////////////////////////////////
 void      timer_event_start(void)
 {
    WAI();
@@ -485,8 +486,47 @@ int timer_setup( __attribute__((unused)) void * arg)
 }
 
 
+// Stuff the timer event structure with the values I want
+// and make it cleaner for other tests to generate timer events.
 
-#define LOCK_LOOPS (10*10)
+ struct rte_event_timer * gen_timer_ev( struct rte_event_timer * p_evt_timer,
+                                        uint32_t flow_id,
+                                        uint8_t  sched_type,
+                                        uint8_t  evt_queue,
+                                        uint8_t  evt_queue_priority,
+                                        void *   evt_ptr) 
+{
+     if( p_evt_timer == NULL)
+     {
+         printf( " ERROR-- I DO NOT TAKE NULL AT THIS TIME \n");
+         // future, allocate a structure from heap or pool.  
+     }  
+     memset(p_evt_timer,0, sizeof(struct rte_event_timer)); 
+     p_evt_timer->state  =  RTE_EVENT_TIMER_NOT_ARMED;  /* set this per documentation*/  
+     p_evt_timer->timeout_ticks = 100;                  /*time in ns (5 seconds for now ???)*/ 
+    // p_evt_timer->impl_opaque[2] ;  per documentation, do not touch
+    // p_evt_timer->user_meta[0] = 0;                        // my application defined data
+
+    // In order to get sso to deliver, I have to add the following to the WQE
+    // p_evt_timer->ev.event=0;    // set event "union" fields to 0
+
+    p_evt_timer->ev.flow_id        = flow_id;                // uint32_t flow_id:20;
+    p_evt_timer->ev.sub_event_type = RTE_EVENT_TYPE_TIMER ;  // uint32_t sub_event_type:8;
+    p_evt_timer->ev.event_type     = RTE_EVENT_TYPE_TIMER ;  // uint32_t event_type:4;
+    p_evt_timer->ev.op             = RTE_EVENT_OP_NEW;       // uint8_t op:2; NEW,FORWARD or RELEASE
+    //p_evt_timer-ev.rsvd           =  ;                     // uint8_t rsvd:4;
+    p_evt_timer->ev.sched_type     = sched_type;             // uint8_t  sched_type:2;  RTE_SCHED_TYPE_PARALLEL
+    p_evt_timer->ev.queue_id       = evt_queue ;             // uint8_t  queue_id; event queue message will be placed in
+    p_evt_timer->ev.priority       = evt_queue_priority ;    // uint8_t  priority;
+    //p_evt_timer->ev.impl_opaque    =  ;                    // uint8_t  impl_opaque;
+
+    p_evt_timer->ev.event_ptr  = (void *) evt_ptr ;      // set the second 64 bits to point this event structure
+
+    return p_evt_timer;
+
+}    
+
+
 #define BATCH_SIZE  4
 
 char  timer_m0[] = { "As"        };
@@ -496,21 +536,16 @@ char  timer_m3[] = { "by"        };
 char * timer_message[] = {timer_m0,timer_m1,timer_m2,timer_m3};
 
 
-#define G_COUNTER_PRINT 3000000 // 0 = print every message
 extern int g_message_counter ;
 extern int g_drop_all_traffic ;
 
-struct rte_event       g_ev;          // use this to encode an event.
+extern struct rte_event       g_ev;          // use this to encode an event.
 struct rte_event_timer g_ev_timer;    // use this to encode a timer event.
 
 int timer_loop( __attribute__((unused)) void * arg)
 {
     unsigned lcore_id;
-//    char string[256];
-//    int  i;
-//    size_t sent = 0, received = 0;
-
-    uint8_t event_dev_id ;
+    uint8_t  event_dev_id ;
    
     struct rte_event events[BATCH_SIZE];
     uint16_t nb_rx; 
@@ -582,32 +617,17 @@ int timer_loop( __attribute__((unused)) void * arg)
            rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
       }
 #endif
-      //  set up the timer event 
 
-      memset(&g_ev_timer,0, sizeof(struct rte_event_timer)); 
-
-      g_ev_timer.state  =  RTE_EVENT_TIMER_NOT_ARMED;  // set this per documentation
-      g_ev_timer.timeout_ticks = 100;                  //time in ns (5 seconds for now)
-      // g_ev_timer.impl_opaque[2] ;  per documentation, do not touch
-      g_ev_timer.user_meta[0] = 0;                        // my application defined data
-
-// In order to get sso to deliver, I have to add the following to the WQE
-      g_ev_timer.ev.event=0;    // set event "union" fields to 0
-       
-      g_ev_timer.ev.flow_id        = 0x07734;                 // uint32_t flow_id:20;
-      g_ev_timer.ev.sub_event_type = RTE_EVENT_TYPE_TIMER ;    // uint32_t sub_event_type:8;
-      g_ev_timer.ev.event_type     = RTE_EVENT_TYPE_TIMER ;    // uint32_t event_type:4;
-      g_ev_timer.ev.op             = RTE_EVENT_OP_NEW;         // uint8_t op:2; NEW,FORWARD or RELEASE
-      //g_ev_timer.ev.rsvd           =  ;                      // uint8_t rsvd:4;
-      g_ev_timer.ev.sched_type     = RTE_SCHED_TYPE_PARALLEL ;       // uint8_t  sched_type:2;
-      g_ev_timer.ev.queue_id       = 0 ;                             // uint8_t  queue_id; event queue message will be placed in
-      g_ev_timer.ev.priority       = 0x80 ;                    // uint8_t  priority;
-      //g_ev_timer.ev.impl_opaque    =  ; // uint8_t  impl_opaque;
-
-      g_ev_timer.ev.event_ptr  = (void *) &g_ev_timer ;  // set the second 64 bits to point this event structure
+    //// Set up timer event structure and add  event_dev sso
 
       p_ev_timer = &g_ev_timer;
 
+      p_ev_timer = gen_timer_ev( p_ev_timer,                 /* struct rte_event_timer *   */
+                                  0x07734 ,                  /* uint32_t flow_id           */
+                                  RTE_SCHED_TYPE_PARALLEL,   /* uint8_t  sched_type        */
+                                  0,                         /* uint8_t  evt_queue         */
+                                  0x80,                      /* uint8_t evt_queue_priority */
+                                  (void *)p_ev_timer );      /* void * evt_ptr */ 
 
 #ifdef PRINT_CALL_ARGUMENTS
       FONT_CALL_ARGUMENTS_COLOR();
@@ -675,8 +695,7 @@ int timer_loop( __attribute__((unused)) void * arg)
             }
             if( events[i].event_type == RTE_EVENT_TYPE_TIMER )
             {     
- 
-                 printf("****    c%d) Received %d events **** \n",lcore_id,nb_rx);
+                 printf("****    c%d) Received %d Timer events from evt_port_id %d**** \n",lcore_id,nb_rx,event_port_id);
                  print_rte_event( 0, "event[i]",&events[i]);
                  printf(" Message:   %s\n", timer_message[core_2_message [lcore_id] ] );
                  
