@@ -16,6 +16,69 @@ void print_rte_eth_vmdq_dcb_conf (int indent, struct rte_eth_vmdq_dcb_conf *d);
 
 #ifdef PRINT_DATA_STRUCTURES
 
+void print_rte_eth_dev_portconf( int indent, struct rte_eth_dev_portconf *d)
+{
+   INDENT(indent);
+
+   printf("%s struct rte_eth_dev_portconf { \n",s);
+   printf("%s    burst_size: 0x%02x\n",s,d->burst_size);
+   printf("%s    ring_size: 0x%02x\n",s,d->ring_size);
+   printf("%s    nb_queues: 0x%02x\n",s,d->nb_queues);
+   printf("%s } \n",s);
+
+}
+
+
+void print_rte_eth_dev_info  (int indent, const char* string,int id, struct rte_eth_dev_info *p)
+{
+    INDENT(indent);
+    printf("%sstruct rte_eth_dev_info %s dev#=%d \n",s,string,id);
+    printf("%s    const char   driver_name                  :  %s\n",s,p->driver_name           );
+    printf("%s    unsigned int if_index                     :  %d\n",s,p->if_index              );
+    printf("%s    uint16_t     min_mtu                      :  %d\n",s,p->min_mtu               );
+    printf("%s    uint16_t     max_mtu                      :  %d\n",s,p->max_mtu               );
+    printf("%s    const uint32_t * dev_flags                :  %p  %x\n",s,p->dev_flags,*p->dev_flags);
+    printf("%s    uint32_t     min_rx_bufsize               :  %d\n",s,p->min_rx_bufsize        );
+    printf("%s    uint32_t     max_rx_pktlen                :  %d\n",s,p->max_rx_pktlen         );
+    printf("%s    uint32_t     max_lro_pkt_size             :  %d\n",s,p->max_lro_pkt_size      );
+    printf("%s    uint16_t     max_rx_queues                :  %d\n",s,p->max_rx_queues         );
+    printf("%s    uint16_t     max_tx_queues                :  %d\n",s,p->max_tx_queues         );
+    printf("%s    uint32_t     max_mac_addrs                :  %d\n",s,p->max_mac_addrs         );
+    printf("%s    uint16_t     max_vfs                      :  %d\n",s,p->max_vfs               );
+    printf("%s    uint16_t     max_vmdq_pools               :  %d\n",s,p->max_vmdq_pools        );
+    printf("%s    struct rte_eth_rxseg_capa    rx_seg_capa  : -TBD-  \n",s          );
+    printf("%s    uint64_t     rx_offload_capa              :  0x%lx\n",s,p->rx_offload_capa       );
+    printf("%s    uint64_t     tx_offload_capa              :  0x%lx\n",s,p->tx_offload_capa       );
+    printf("%s    uint64_t     rx_queue_offload_capa        :  0x%lx\n",s,p->rx_queue_offload_capa );
+    printf("%s    uint64_t     tx_queue_offload_capa        :  0x%lx\n",s,p->tx_queue_offload_capa );
+    printf("%s    uint16_t     reta_size                    :  %d\n",s,p->reta_size             );
+    printf("%s    uint8_t      hash_key_size                :  %d\n",s,p->hash_key_size         );
+    printf("%s    uint64_t     flow_type_rss_offloads       :  0x%lx\n",s,p->flow_type_rss_offloads);
+    print_rte_eth_rxconf(indent+1 , &(p->default_rxconf));
+    print_rte_eth_txconf(indent+1 , &(p->default_txconf));
+    printf("%s    uint16_t     vmdq_queue_base              :  %d\n",s,p->vmdq_queue_base       );
+    printf("%s    uint16_t     vmdq_queue_num               :  %d\n",s,p->vmdq_queue_num        );
+    printf("%s    uint16_t     vmdq_pool_base               :  %d\n",s,p->vmdq_pool_base        );
+    printf("%s    struct rte_eth_desc_lim      rx_desc_lim  :  -TBD-\n",s           );
+    printf("%s    struct rte_eth_desc_lim      tx_desc_lim  :  -TBD-\n",s           );
+    printf("%s    uint32_t     speed_capa                   :  %d\n",s,p->speed_capa            );
+    printf("%s    uint16_t     nb_rx_queues                 :  %d\n",s,p->nb_rx_queues          );
+    printf("%s    uint16_t     nb_tx_queues                 :  %d\n",s,p->nb_tx_queues          );
+    print_rte_eth_dev_portconf( indent+1 ,&(p->default_rxportconf));
+    print_rte_eth_dev_portconf( indent+1 , &(p->default_txportconf));
+    printf("%s    uint64_t     dev_capa                     :  0x%lx\n",s,p->dev_capa              );
+    printf("%s    struct rte_eth_switch_info   switch_info  :  -TBD-\n",s           );
+    printf("%s    uint64_t     reserved_64s [0]             :  0x%lx\n",s,p->reserved_64s [0]      );
+    printf("%s    uint64_t     reserved_64s [1]             :  0x%lx\n",s,p->reserved_64s [1]      );
+    printf("%s    void *       reserved_ptrs [0]            :  %p\n",s,p->reserved_ptrs [0]      );
+    printf("%s    void *       reserved_ptrs [1]            :  %p\n",s,p->reserved_ptrs [1]      );
+}
+
+
+
+
+
+
 /*****************************************************************************
  *  eth dev print functions
  ****************************************************************************/
@@ -235,7 +298,6 @@ struct rte_intr_conf    intr_conf
 
  }
 #endif
-
 #endif
 
 

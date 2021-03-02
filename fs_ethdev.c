@@ -63,6 +63,8 @@
 #include "fs_print_rte_ethdev_struct.h"
 #include "fs_core.h"
 #include "fs_eventdev_timer.h"
+#include "fprintbuff.h"
+#include "fs_net_common.h"
 
 #include "fs_global_vars.h"
 
@@ -70,6 +72,9 @@
 
 extern uint64_t  g_core_messages;
 extern int64_t g_print_interval;
+
+uint64_t  g_rx_packet_cnt[32] = {0};
+
 
 void print_eth_setup(void);
 void print_eth_setup(void)
@@ -278,7 +283,6 @@ void print_global_data(global_data_t *p);
 //      rte_eth_rx_queue_setup()           allowocate rx queues
 //      rte_eth_tx_queue_setup()           allocate tx Queues
 //      prte_eth_promiscuous_enable()      put interface in Promiscuous mode.
-void   initialize_eth_dev_ports(void);
 void   initialize_eth_dev_ports(void)
 {         
     uint16_t port_id;
@@ -468,7 +472,6 @@ void   initialize_eth_dev_ports(void)
 //////////////////////////////////////////////
 //////////////////////////////////////////////
 //  Start all the ethernet interfaces.
-void ethdev_start(void);
 void ethdev_start(void)
 {
     uint16_t port_id;
@@ -498,7 +501,6 @@ void ethdev_start(void)
 //////////////////////////////////////////////
 //////////////////////////////////////////////
 /* Check the link status of all ports in up to 9s, and print them finally */
-void check_ports_link_status(uint32_t port_mask);
 void check_ports_link_status(uint32_t port_mask)
 {
 #define CHECK_INTERVAL 100 /* 100ms */
@@ -574,7 +576,6 @@ void check_ports_link_status(uint32_t port_mask)
 //  malloc()                           -allocates memory to save an index to each rx_adapter
 //  rte_event_eth_rx_adapter_create()  -create the adapter 
 
-void  rx_tx_adapter_setup_internal_port(void);
 void  rx_tx_adapter_setup_internal_port(void)
 {
     struct   rte_event_eth_rx_adapter_queue_conf eth_q_conf;
@@ -1143,8 +1144,6 @@ char  ethdev_m3[] = { "wall"};
 char * ethdev_message[] = {ethdev_m0,ethdev_m1,ethdev_m2,ethdev_m3};
 
 
-#define G_COUNTER_PRINT 3000000 // 0 = print every message
-int g_message_counter = 0;
 int g_drop_all_traffic = 0;
 
 struct rte_event         g_ev        __rte_cache_aligned;          // use this to encode an event.
@@ -1350,15 +1349,24 @@ int ethdev_loop( __attribute__((unused)) void * arg)
             else if (events[i].event_type == RTE_EVENT_TYPE_ETHDEV )  // event -> etherent packet 
             {
 //<FS>
-                 core_counter--;
-                 // only fall in if p_print_interval is >0 else do not print
-                 if ((  core_counter < 0 ) && (g_print_interval > 0))
-                 {
-                     struct rte_mbuf *  p_mbuff;
-                     uint8_t *          buf;
+                 struct rte_mbuf *  p_mbuff = events[i].mbuf ;    // fish out the mbuff pointer. 
+                 uint8_t *          buf;             
+                 MAC_Hdr_t          l2_hdr;
 
+                 g_rx_packet_cnt[lcore_id]++;
+                 core_counter--;
+                 buf = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
+                 GetMacData(buf,&l2_hdr);
+                 
+                 if( l2_hdr.EtherType == 0x0806 ) /* ICMP */
+                 {
+                      printf("%s GOT AN ICMP Packet!! %s \n",C_RED, C_NORMAL);
+                 } 
+
+                 // only fall in if p_print_interval is >0 else do not print
+                 if ((  core_counter <= 0 ) && (g_print_interval > 0))
+                 {
                      core_counter = g_print_interval;
-                     p_mbuff = events[i].mbuf;
 
                      printf("%d< got packet  Stream  flow_id: 0x%05x  queue_id: %d, port_id %d\n",
                                                                       lcore_id,
@@ -1367,14 +1375,17 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                                                                       event_port_id );
                      if(g_verbose > 3)
                      {
-                         buf = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
                          PrintBuff((uint8_t*) buf, 0x40 , NULL ,"mbuff Raw Buffer");
                      }
-                      if(g_verbose > 3)
+                      if(g_verbose > 4)
                      {
                          PrintBuff((uint8_t*) p_mbuff, (0x100 + p_mbuff->pkt_len + 0x10) , NULL ,"mbuff Raw Buffer");
                          print_rte_mbuf(0,p_mbuff);
                      }
+                     if(g_verbose > 2)
+                     {
+                         printf(" rx_pkt_cnt: %lu \n",g_rx_packet_cnt[lcore_id]);
+                     } 
                  }
 //<FS>
                  if ( g_drop_all_traffic  == 1)
@@ -1450,7 +1461,16 @@ Close an event device. The device cannot be restarted! */
      rte_event_dev_close( g_glob.event_dev_id );
 
 
-/* clear ethdev resourcesi*/
+/* clear ethdev resources*/
+    if ( g_glob.evq.event_q_cfg  != NULL)       free(g_glob.evq.event_q_cfg);
+    if ( g_glob.evp.event_p_id != NULL)         free(g_glob.evp.event_p_id);
+    if ( g_glob.rx_adptr.rx_adptr != NULL)      free(g_glob.rx_adptr.rx_adptr);
+    if ( g_glob.rx_adptr.rx_adptr_add != NULL)  free(g_glob.rx_adptr.rx_adptr_add);
+    if ( g_glob.tx_adptr.tx_adptr != NULL)      free(g_glob.tx_adptr.tx_adptr);
+    if ( g_glob.tx_adptr.tx_adptr_add != NULL)  free(g_glob.tx_adptr.tx_adptr_add);
+
+
+
 /* free the mbuff pool */
 #if 0
     USED L2FWD_EVENT as example and this buffer is never freed

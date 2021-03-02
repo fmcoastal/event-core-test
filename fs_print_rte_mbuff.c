@@ -132,16 +132,17 @@ void print_rte_mbuf(int indent, struct rte_mbuf *m)
     printf("%s   (uint16_t) priv_size       0x%08x          offset:0x%lx \n",s,m->priv_size  ,offsetof(struct rte_mbuf,priv_size ));
     printf("%s   (uint16_t) timesync        0x%08x          offset:0x%lx \n"    ,s,m->timesync   ,offsetof(struct rte_mbuf,timesync ));
     printf("%s   (uint32_t) seqn            0x%08x          offset:0x%lx \n"    ,s,m->seqn       ,offsetof(struct rte_mbuf,seqn ));
-    printf("%s   (struct rte_mbuf_ext_shared_info *) shinfo 0x%p\n",s,m->shinfo);
+    printf("%s   (struct rte_mbuf_ext_shared_info *) shinfo 0x%p  offset:0x%lx \n",s,m->shinfo   ,offsetof(struct rte_mbuf,shinfo ));
 
-    printf("%s   (uint64_t) dynfield1[0]           0x%016lx\n",s,m->dynfield1[0]);
-    printf("%s   (uint64_t) dynfield1[1]           0x%016lx\n",s,m->dynfield1[1]);
-    printf("%s   (uint32_t) packet_type            0x%08x   offset:0x%lx \n",s,m->packet_type    ,offsetof(struct rte_mbuf,packet_type ));
+    printf("%s   (uint64_t) dynfield1[0]           0x%016lx        offset:0x%lx \n",s,m->dynfield1[0], offsetof(struct rte_mbuf,dynfield1[0] ));
+    printf("%s   (uint64_t) dynfield1[1]           0x%016lx        offset:0x%lx \n",s,m->dynfield1[1], offsetof(struct rte_mbuf,dynfield1[1] ));
+    printf("%s   (uint64_t) dynfield1[8]           0x%016lx        offset:0x%lx \n",s,m->dynfield1[8], offsetof(struct rte_mbuf,dynfield1[8] ));
+    printf("%s   (uint32_t) packet_type            0x%08x          offset:0x%lx \n",s,m->packet_type,  offsetof(struct rte_mbuf,packet_type ));
 
 
-    printf("%s   (uint8_t:4) l2_type               0x%01x\n",s,m->l2_type);
-    printf("%s   (uint8_t:4) l3_type               0x%01x\n",s,m->l3_type);
-    printf("%s   (uint8_t:4) l4_type               0x%01x\n",s,m->l4_type);
+    printf("%s   (uint8_t:4) l2_type               0x%01x          offset:0x bit \n",s,m->l2_type   );
+    printf("%s   (uint8_t:4) l3_type               0x%01x          offset:0x bit \n",s,m->l3_type    );
+    printf("%s   (uint8_t:4) l4_type               0x%01x          offset:0x bit \n",s,m->l4_type    );
     printf("%s   (uint8_t:4) tun_type              0x%01x\n",s,m->tun_type);
     printf("%s   (uint8_t) inner_esp_next_proto    0x%02x\n",s,m->inner_esp_next_proto);
     printf("%s   (uint8_t:4) inner_l2_type         0x%01x\n",s,m->inner_l2_type);

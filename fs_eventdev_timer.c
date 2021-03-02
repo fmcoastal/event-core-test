@@ -536,7 +536,6 @@ char  timer_m3[] = { "by"        };
 char * timer_message[] = {timer_m0,timer_m1,timer_m2,timer_m3};
 
 
-extern int g_message_counter ;
 extern int g_drop_all_traffic ;
 
 extern struct rte_event       g_ev;          // use this to encode an event.

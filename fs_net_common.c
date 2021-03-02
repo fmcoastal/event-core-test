@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <stddef.h>     // for offsetof
+#include <arpa/inet.h>  // for ntohl, htonl, ...
 
 #include "fs_extras.h"
 #include "fs_net_common.h"
@@ -341,7 +342,7 @@ int  CompareMAC(MacAddr_t* mac0, MacAddr_t* mac1)
 }
 
 
-void printMAC_Hdr(MAC_Hdr *hdr)
+void printMAC_Hdr_t(MAC_Hdr_t *hdr)
 {
     uint16_t eth_type;
     printf("\n");
@@ -369,14 +370,16 @@ void printMAC_Hdr(MAC_Hdr *hdr)
      printf("\n");
 }
 
-// copies the MAC header data to the structure pointed to by MAC_Hdr
-int GetMacData(uint8_t * pMACStart, MAC_Hdr *ExtractedData)
+// copies the MAC header data to the structure pointed to by MAC_Hdr_t
+int GetMacData(uint8_t * pMACStart, MAC_Hdr_t *ExtractedData)
 {
     unsigned int i = 0;
     char * ptr;
+    uint16_t r;
 
     // First 12 bytes are destination and source MAC address
-    // not clear if compiler will keep the MAC_Hdr data packed
+    // not clear if compiler will keep the MAC_Hdr_t data packed
+    r = 12;
     ptr = (char *) &(ExtractedData->DstMac.addr[0]);
     for( i = 0 ; i < sizeof(MacAddr_t) ; i++)
     {
@@ -392,6 +395,7 @@ int GetMacData(uint8_t * pMACStart, MAC_Hdr *ExtractedData)
     // unsigned short must be 16 bits for this to work
     if( *((unsigned short*)pMACStart) == 0x0801)
     {
+        r += 4;
         ExtractedData->Q802_3 += 1;
         pMACStart+=2;
         ExtractedData->vlan_0 = *((unsigned short *)pMACStart);
@@ -399,13 +403,14 @@ int GetMacData(uint8_t * pMACStart, MAC_Hdr *ExtractedData)
     }
     if( *((unsigned short*)pMACStart) == 0x0801)
     {
+        r += 4;
         ExtractedData->Q802_3 += 1;
         pMACStart+=2;
         ExtractedData->vlan_1 = *((unsigned short *)pMACStart);
         pMACStart+=2;
     }
     ExtractedData->EtherType = *((unsigned short *)pMACStart);
-
+    ExtractedData->hdr_sz =  r;
     return 0;
 }
 
@@ -413,10 +418,10 @@ int GetMacData(uint8_t * pMACStart, MAC_Hdr *ExtractedData)
 //   does not count the 4bytes of crc at the end.
 int GetMacHeaderSize(uint8_t * pMACStart)
 {
-    unsigned int r = 0;
+    int r;
 
     // First 12 bytes are destination and source MAC address
-    // not clear if compiler will keep the MAC_Hdr data packed
+    // not clear if compiler will keep the MAC_Hdr_t data packed
     r = 12;
     pMACStart += 12;
     // looking at interframe gap or Q802.3 depending on value
@@ -437,6 +442,27 @@ int GetMacHeaderSize(uint8_t * pMACStart)
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////  arp  //////////////////////////////////////////
+//Arp Header
+void printArpPktData_t(ArpPktData_t *p)
+{   
+    printf("\n");
+    printf("ARP Header:   %p { \n",p );
+
+    printf("%s    uint16_t   HwType           0x%04x  offset: 0x%02lx \n" ,"",ntohs(p->HwType)   ,offsetof(ArpPktData_t,HwType) );
+    printf("%s    uint16_t   Protocol;        0x%04x  offset: 0x%02lx \n" ,"",htons(p->Protocol) ,offsetof(ArpPktData_t,Protocol) );
+    printf("%s    uint16_t   HwAddLen;        0x%04x  offset: 0x%02lx \n" ,"",ntohs(p->HwAddLen) ,offsetof(ArpPktData_t,HwAddLen) );
+    printf("%s    uint16_t   ProtocolAddLen;  0x%04x  offset: 0x%02lx \n" ,"",htons(p->ProtocolAddLen)  ,offsetof(ArpPktData_t,ProtocolAddLen));
+    printf("%s    uint16_t   OpCode;          0x%04x  offset: 0x%02lx \n" ,"",htons(p->OpCode)   ,offsetof(ArpPktData_t,OpCode) );
+    printf("%s    MacAddr_t  SrcHwAddr;        %s  \n"    ,"", formatMACAddr( &p->SrcHwAddr)  );
+    printf("%s    uint32_t   SrcProtocolAddr   %s  \n"    ,"", formatIpAddr(ntohl(p->SrcProtocolAddr)));
+    printf("%s    MacAddr_t  TarHwAddr         %s  \n"    ,"", formatMACAddr( &p->TarHwAddr    ) );
+    printf("%s    uint32_t   TarProtocolAddr   %s  \n"    ,"", formatIpAddr(ntohl(p->TarProtocolAddr)));
+    printf("} \n" );
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////IPv4//////////////////////////////////////////
 //IP Header
 
@@ -453,7 +479,7 @@ char * formatIPAddr(uint32_t IpAddr)
 }
 
 
-void printIPv4_Hdr(IPv4_Hdr *hdr)
+void printIPv4_Hdr_t(IPv4_Hdr_t *hdr)
 {
     printf("\n");
     printf("IPv4 Header:\n");
@@ -475,8 +501,8 @@ void printIPv4_Hdr(IPv4_Hdr *hdr)
     printf("  0x%04x      Options\n"                      , hdr->Options);
 }
 
-// copies the MAC header data to the structure pointed to by MAC_Hdr
-int GetIPv4Data(uint8_t * pIPv4Start, IPv4_Hdr *ExtractedData)
+// copies the MAC header data to the structure pointed to by MAC_Hdr_t
+int GetIPv4Data(uint8_t * pIPv4Start, IPv4_Hdr_t *ExtractedData)
 {
     unsigned short int i = 0;
     char c;
@@ -540,7 +566,7 @@ void printUDP_Hdr(UDP_Hdr *hdr)
     printf("\n");
 }
 
-// copies the MAC header data to the structure pointed to by MAC_Hdr
+// copies the MAC header data to the structure pointed to by MAC_Hdr_t
 int GetUDPData(uint8_t * pUDPStart, UDP_Hdr *ExtractedData)
 {
     uint16_t * ptr = (unsigned short *)pUDPStart;
@@ -599,10 +625,10 @@ header is fine or corrupted. */
 // static uint16_t CalculateIPv4CkSum(uint8_t * buf );
 
 //   Calculates Length and Checksum
-// static uint64_t build_IPv4_packet(IPv4_Hdr *IPv4Hdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf,     uint16_t BufSz );
+// static uint64_t build_IPv4_packet(IPv4_Hdr_t *IPv4Hdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf,     uint16_t BufSz );
 
 // build_mac_packet
-// static uint64_t build_MAC_packet(MAC_Hdr *MACHdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, ui    nt16_t BufSz );
+// static uint64_t build_MAC_packet(MAC_Hdr_t *MACHdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, ui    nt16_t BufSz );
 
 
 
@@ -663,7 +689,7 @@ uint16_t CalculateIPv4CkSum(uint8_t * buf )
 
 
 //   Calculates Length and Checksum
-uint64_t build_IPv4_packet(IPv4_Hdr *IPv4Hdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz )
+uint64_t build_IPv4_packet(IPv4_Hdr_t *IPv4Hdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz )
 {
     int     i,index;
     uint8_t  *ptr ;
@@ -739,11 +765,11 @@ uint64_t build_IPv4_packet(IPv4_Hdr *IPv4Hdr ,uint8_t * pData, uint16_t DataSz,u
 //    in DataSz  ->  IP data Packet Size
 //    in pbuf    ->  location/buffer to where the packet is written
 //    in BufSz   ->  in size of starting buffer out - final packet size
-uint64_t build_MAC_packet(MAC_Hdr *MACHdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz )
+uint64_t build_MAC_packet(MAC_Hdr_t *MACHdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz )
 {
     uint64_t  j;
     uint8_t  *ptr ;
-    MAC_Hdr  *macptr = (MAC_Hdr *)pBuf;
+    MAC_Hdr_t  *macptr = (MAC_Hdr_t *)pBuf;
 
     if(BufSz < (DataSz + MAC_HEADER_SIZE + (MACHdr->Q802_3 * 4)))  // Size of Final Packet
     {
@@ -862,8 +888,8 @@ static uint8_t  g_MACBuff[G_BUFF_SIZE];
 int  FBuildUdpPacket( ip_endpt_t *dst,ip_endpt_t *src ,uint8_t * data, int64_t datasz ,uint8_t **PktPtr,int64_t * PktSz )
 {
     UDP_Hdr  UDPHdr  ;
-    IPv4_Hdr IPv4Hdr ;
-    MAC_Hdr  MACHdr  ;
+    IPv4_Hdr_t IPv4Hdr ;
+    MAC_Hdr_t  MACHdr  ;
 
     int i;
 #if 0
@@ -983,12 +1009,11 @@ int ParsePacketData( uint8_t *buf, int64_t bufsz,
     unsigned char * pPayload;
     int64_t         PayloadSz;
 
-    MAC_Hdr         lMAChdr;
+    MAC_Hdr_t         lMAChdr;
     unsigned char * pIPv4;
-    IPv4_Hdr         lIPv4hdr;
+    IPv4_Hdr_t         lIPv4hdr;
     unsigned char * pUDP;
     UDP_Hdr         lUDPhdr;
-
 
     WAI();
     if(L3Type    != NULL) *L3Type    = 0;
@@ -1007,7 +1032,7 @@ int ParsePacketData( uint8_t *buf, int64_t bufsz,
 #ifdef DBG_GPD
 // fs check this
     printf("Size of MAC Hdr  0x%02x    %d\n", GetMacHeaderSize((uint8_t *) pMac), GetMacHeaderSize((uint8_t *) pMac));
-    printMAC_Hdr(&lMAChdr);
+    printMAC_Hdr_t(&lMAChdr);
     printf("\n");
 #endif
     if( DstMAC != NULL)
@@ -1022,7 +1047,8 @@ int ParsePacketData( uint8_t *buf, int64_t bufsz,
      if(bufsz == 0) return -1;
 
     // figure out the size of the entire packet
-    if(pktsz   != NULL) *pktsz =  GetMacHeaderSize((uint8_t *) pMac) ;   // the size of the packet
+    //if(pktsz   != NULL) *pktsz =  GetMacHeaderSize((uint8_t *) pMac) ;   // the size of the packet
+    if(pktsz   != NULL) *pktsz = lMAChdr.hdr_sz ;   // the size of the packet
     // make the assumption here we are an ARP or IPV4 packet
     //  return if ARP
     //  error if not IPV4
@@ -1059,7 +1085,7 @@ int ParsePacketData( uint8_t *buf, int64_t bufsz,
     GetIPv4Data(((uint8_t *) pIPv4),&lIPv4hdr);
 #ifdef DBG_GPD
     printf("Size of IPv4 Hdr 0x%02x    %d\n", GetIPv4HeaderSize((uint8_t *) pIPv4), GetIPv4HeaderSize((uint8_t *) pIPv4));
-    printIPv4_Hdr(&lIPv4hdr);
+    printIPv4_Hdr_t(&lIPv4hdr);
     printf("\n");
 #endif
     // add the IP header size field because it inclueds the IP header and Payload
@@ -1139,7 +1165,7 @@ int ParsePacketData( uint8_t *buf, int64_t bufsz,
 }
 
 
-
+#ifdef USE_THIS_PRINTBUFF
 #define LLU  long long unsigned
 #define fsprint printf
 
@@ -1316,7 +1342,7 @@ void PrintBuff(uint8_t * buffer, int64_t bufferSize,uint8_t * Address,const char
     }
     fsprint("\n");
 }
-
+#endif
 
 
 

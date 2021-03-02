@@ -39,8 +39,9 @@
 //#define BYTE_SWAP(x) ( ((x << 8) & 0xff00) | (( x >> 8)  & 0x00ff))
 //#define BYTE_SWAP(x) x
 
+#ifdef USE_THIS_PRINTBUFF
 void PrintBuff(uint8_t * buffer, int64_t bufferSize,uint8_t * Address,const char * title);
-
+#endif
 
 
 
@@ -132,9 +133,10 @@ typedef struct
                               checksum on all the bits in the frame from Destination MAC Address (DA)
                               to the Pad fields (that is, all fields except the preamble,
                               start frame delimiter, and frame check sequence). */
+    uint16_t  hdr_sz;      // lenght of the l2_header
     uint32_t  TotPacketLenght;  /* EVOL--only valid after packet create total packet
                                    length with CRC32 a the end (Bytes) */
-}MAC_Hdr;
+}MAC_Hdr_t;
 
 
 // returns a string of a human readable formatted Mac String.
@@ -151,10 +153,11 @@ extern  void SetMAC(MacAddr_t* Dst, MacAddr_t* Src);
 // returns 0 if the mac addresses are Identical
 extern  int  CompareMAC(MacAddr_t* mac0, MacAddr_t* mac1);
 
-extern  void printMAC_Hdr(MAC_Hdr *hdr);
+extern  void printMAC_Hdr_t(MAC_Hdr_t *hdr);
 
-// copies the MAC header data to the structure pointed to by MAC_Hdr
-extern   int GetMacData(uint8_t * pMACStart, MAC_Hdr *ExtractedData);
+// copies the MAC header data to the structure pointed to by MAC_Hdr_t
+//    if sz!= null, returns the size of the l2 hdr
+extern   int GetMacData(uint8_t * pMACStart, MAC_Hdr_t *ExtractedData);
 
 // Returns the number of bytes to the "Next Packet Type"
 //   does not count the 4bytes of crc at the end.
@@ -194,7 +197,7 @@ typedef struct
     uint32_t  SrcIPAddr;
     uint32_t  DstIPAddr;
     uint32_t  Options;
-}IPv4_Hdr;
+}IPv4_Hdr_t;
 
 // no options included in size below !!!!!!!!!!
 #define IP_HDR_STRT_SZ  (sizeof(uint8_t)*4  + sizeof(uint16_t)*4 +  sizeof(uint32_t)*2 )
@@ -203,10 +206,10 @@ typedef struct
 
 extern  char * formatIPAddr(uint32_t IpAddr);
 
-extern  void printIPv4_Hdr(IPv4_Hdr *hdr);
+extern  void printIPv4_Hdr_t(IPv4_Hdr_t *hdr);
 
-// copies the MAC header data to the structure pointed to by MAC_Hdr
-extern  int GetIPv4Data(uint8_t * pIPv4Start, IPv4_Hdr *ExtractedData);
+// copies the MAC header data to the structure pointed to by MAC_Hdr_t
+extern  int GetIPv4Data(uint8_t * pIPv4Start, IPv4_Hdr_t *ExtractedData);
 
 // Returns the number of bytes to the "Next Packet Type"
 extern int GetIPv4HeaderSize(uint8_t * pIPv4Start);
@@ -220,8 +223,8 @@ extern int GetIPv4HeaderSize(uint8_t * pIPv4Start);
 typedef struct __attribute__((__packed__)) {
     uint16_t HwType;
     uint16_t Protocol;
-    uint8_t  HwAddLen;
-    uint8_t  ProtocolAddLen;
+    uint16_t  HwAddLen;
+    uint16_t  ProtocolAddLen;
     uint16_t OpCode;
     MacAddr_t  SrcHwAddr;
     uint32_t  SrcProtocolAddr;
@@ -230,6 +233,28 @@ typedef struct __attribute__((__packed__)) {
 }ArpPktData_t;
 
 
+extern  void printArpPktData_t(ArpPktData_t *hdr);
+
+#if 0
+17:33:17.581561 ARP, Request who-has lobo tell 192.168.1.11, length 46
+        0x0000:  e4a7 a031 47d7 0022 4d9d 604b 0806 0001
+        0x0010:  0800 0604 0001 0022 4d9d 604b c0a8 010b
+        0x0020:  0000 0000 0000 c0a8 0105 0000 0000 0000
+        0x0030:  0000 0000 0000 0000 0000 0000
+17:33:17.581624 ARP, Reply lobo is-at e4:a7:a0:31:47:d7 (oui Unknown), length 28
+        0x0000:  0022 4d9d 604b e4a7 a031 47d7 0806 0001
+        0x0010:  0800 0604 0002 e4a7 a031 47d7 c0a8 0105
+        0x0020:  0022 4d9d 604b c0a8 010b
+17:33:17.596437 ARP, Request who-has 192.168.1.11 tell lobo, length 28
+        0x0000:  0022 4d9d 604b e4a7 a031 47d7 0806 0001
+        0x0010:  0800 0604 0001 e4a7 a031 47d7 c0a8 0105
+        0x0020:  0000 0000 0000 c0a8 010b
+17:33:17.599158 ARP, Reply 192.168.1.11 is-at 00:22:4d:9d:60:4b (oui Unknown), length 46
+        0x0000:  e4a7 a031 47d7 0022 4d9d 604b 0806 0001
+        0x0010:  0800 0604 0002 0022 4d9d 604b c0a8 010b
+        0x0020:  e4a7 a031 47d7 c0a8 0105 0000 0000 0000
+        0x0030:  0000 0000 0000 0000 0000 0000
+#endif
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -250,7 +275,7 @@ typedef struct
 
 extern void printUDP_Hdr(UDP_Hdr *hdr);
 
-// copies the MAC header data to the structure pointed to by MAC_Hdr
+// copies the MAC header data to the structure pointed to by MAC_Hdr_t
 extern  int GetUDPData(uint8_t * pUDPStart, UDP_Hdr *ExtractedData);
 
 // Returns the number of bytes to the "Next Packet Type"
@@ -294,10 +319,10 @@ header is fine or corrupted. */
 // static uint16_t CalculateIPv4CkSum(uint8_t * buf );
 
 //   Calculates Length and Checksum
-uint64_t build_IPv4_packet(IPv4_Hdr *IPv4Hdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf,     uint16_t BufSz );
+uint64_t build_IPv4_packet(IPv4_Hdr_t *IPv4Hdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf,     uint16_t BufSz );
 
 // build_mac_packet
-uint64_t build_MAC_packet(MAC_Hdr *MACHdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz );
+uint64_t build_MAC_packet(MAC_Hdr_t *MACHdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz );
 
 
 /*

@@ -25,6 +25,9 @@ void print_rte_eth_vmdq_dcb_conf (int indent, struct rte_eth_vmdq_dcb_conf *d);
 void print_rte_eth_rxconf( int indent, struct rte_eth_rxconf *d);
 void print_rte_eth_txconf( int indent, struct rte_eth_txconf *d);
 
+void print_rte_eth_dev_portconf( int indent, struct rte_eth_dev_portconf *d);
+void print_rte_eth_dev_info  (int indent, const char* string,int id, struct rte_eth_dev_info *p);
+
 
 #else
 
