@@ -1,0 +1,21 @@
+#!/bin/bash
+
+#  Instead of linking in a bunch of different files into the program and 
+#     and keeping everything compiling,  What I have decided to do is
+#     create fs_test_xxxxx.[ch] and use soft links to compile the
+#     variation files into the application.
+#
+#     you will need to update the "x" file to call the correct pass in arguments
+#       maybe I will rework argv and arg c such that a string in the fs_test_xxxx.c
+#       file is added to the command line arguments (TBD)  
+
+
+
+ln fs_test_multi_evt_port.c  fs_test.c
+ln fs_test_multi_evt_port.h  fs_test.h
+
+
+#ln fs_test_parse.c  fs_test.c
+#ln fs_test_parse.h  fs_test.h
+
+
