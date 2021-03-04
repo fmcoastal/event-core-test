@@ -539,6 +539,10 @@ int test_loop( __attribute__((unused)) void * arg)
         }
         for(i = 0 ; i < nb_rx ; i++)
         {
+   
+////////////////////
+// switch through the event types
+//////////////////// 
             if( events[i].event_type == RTE_EVENT_TYPE_CPU )
             {     
  
@@ -575,69 +579,136 @@ int test_loop( __attribute__((unused)) void * arg)
 
 //<FS>
                   struct rte_mbuf *  p_mbuff = events[i].mbuf ;    // fish out the mbuff pointer.
-                  uint8_t *          buf;
-                  MAC_Hdr_t          l2_hdr;
-                  g_rx_packet_cnt[lcore_id]++;
-                  core_counter--;
+                  uint8_t *          l4_ptr;
+                  uint8_t *          l3_ptr;
+                  uint8_t *          l2_ptr;   // pointer to the l2 header.       
+                  MAC_Hdr_t          l2_hdr;   // MAC_HDR_T is not memory aligned to an l2 header.  
+                                               //   the structure has header size and saves vlans
+                                               //   if it find them in the header. 
+                  g_rx_packet_cnt[lcore_id]++; // increment stats 
+                  core_counter--;              //  core counter used to print every "p" packets
+////////////////////
+// Print Packet Info
+//////////////////// 
+                  if ((  core_counter <= 0 ) && (g_print_interval > 0))
+                  {
+                      core_counter = g_print_interval;
+                      print_rte_event(0,"RTE_EVENT_TYPE_ETHDEV",&events[i] );                 
+                      printf("%d< Received RTE_EVENT_TYPE_ETHDEV   flow_id: 0x%05x  queue_id: %d, port_id %d\n",
+                                                                   lcore_id,
+                                                                   events[i].flow_id,
+                                                                   events[i].queue_id,
+                                                                   event_port_id );
+      
+                      if(g_verbose > 3)
+                      {
+                          l2_ptr = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
+                          PrintBuff((uint8_t*) l2_ptr, 0x100 , l2_ptr ,"rte_eth_header:");
+                      }
+                      if(g_verbose > 4)
+                      {
+                          PrintBuff((uint8_t*) p_mbuff, (0x100 + p_mbuff->pkt_len + 0x10) , (unsigned char *)p_mbuff ,"mbuff Raw Buffer");
+                          print_rte_mbuf(0,p_mbuff);
+                      }
+                      if(g_verbose > 2)
+                      {
+                          printf(" rx_pkt_cnt: %lu \n",g_rx_packet_cnt[lcore_id]);
+                      }
+                  }  // end print packet info
 
+////////////////////////
+// parse out packet info
+/////////////////////////
                   // fish out some packet data
-                  buf = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
-                  GetMacData(buf,&l2_hdr);
-                  printMAC_Hdr_t(&l2_hdr);
-                  buf += l2_hdr.hdr_sz;
+                  l2_ptr = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
+                  
+                  GetMacData(l2_ptr,&l2_hdr);           // fish the field info out of the data
+                  printMAC_Hdr_t(&l2_hdr);              // print the header
+                  l3_ptr =  l2_ptr +  l2_hdr.hdr_sz;    // mover pointer forward to point to l3 info 
+
+
+                  printf("  l2_hdr.EtherType   0x%04x   htons(0x0806) 0x%04x \n", l2_hdr.EtherType ,  htons(0x0806));
 
                   if( l2_hdr.EtherType == htons(0x0806) ) /* ARP - ICMP */
                   {
-#define MY_IP_ADDRESS  0xc0a80364
-                       ArpPktData_t * p_arp = (ArpPktData_t *)buf  ;
+                       uint32_t  g_IP_eth0 =  0xc0a80364 ;    // 192.168.3.100
+                       MacAddr_t g_Mac_eth0 ={.addr[0]=0x00, .addr[1]=0x0f, 
+                                             .addr[2]=0xb7, .addr[3]=0x06,
+                                             .addr[4]=0x10, .addr[5]=0xf3}; 
+                       
+                       ArpPktData_t * p_arp = (ArpPktData_t *)l3_ptr  ;
                        printf("%s GOT AN ICMP Packet!! %s \n",C_RED, C_NORMAL);
-                       PrintBuff((uint8_t*) buf, sizeof(ArpPktData_t) , buf ,"ArpPktData_t:");
+                       PrintBuff((uint8_t*) l3_ptr, sizeof(ArpPktData_t) , l3_ptr ,"ArpPktData_t:");
                        printArpPktData_t(p_arp);
 
-                       if ( ntohl(p_arp->TarProtocolAddr) == MY_IP_ADDRESS)
+                       if ( ntohl(p_arp->TarProtocolAddr) == g_IP_eth0)
                        {
+                           ArpPktData_t  d;
+                           
                            printf("%s IT is for ME!! %s \n",C_RED, C_NORMAL);
+                           
+                           // save off the original
+                            memcpy(&d , p_arp, sizeof(ArpPktData_t));
+                           // move the macs
+                            SetMAC( &(p_arp->SrcHwAddr), &d.TarHwAddr);
+                            SetMAC( &(p_arp->TarHwAddr), &g_Mac_eth0 );
+                            // move the IP address
+                            p_arp->SrcProtocolAddr = d.TarProtocolAddr;
+                            p_arp->TarProtocolAddr = d.SrcProtocolAddr;
+                            // set opcode to response
+                            p_arp->OpCode = htons(0x0002);
+                           
+                            // swap L2_hdr mac addresses
+                            SetMAC(  (MacAddr_t *) l2_ptr       , &d.SrcHwAddr); 
+                            SetMAC(  (MacAddr_t *) (l2_ptr + 6 ), &g_Mac_eth0); 
+
+                            PrintBuff((uint8_t*) l2_ptr, sizeof(ArpPktData_t)+ l2_hdr.hdr_sz , l2_ptr ,"Arp Response:");
                        }
                   }
+                  else if (l2_hdr.EtherType == htons(0x0800) ) /* IPV4  */ // process IPV4 packet type
+                  {
+                     IPv4_Hdr_t ipV4;
+                     GetIPv4Data( l3_ptr, &ipV4 ) ;
+                     printIPv4_Hdr_t(  &ipV4);
 
-                 // only fall in if p_print_interval is >0 else do not print
-                 if ((  core_counter <= 0 ) && (g_print_interval > 0))
-                 {
+                     l4_ptr = l3_ptr += (ipV4.HeaderLength * 4)  ;   // point to the L3 Data type
+                     switch ( ipV4.Protocol ) {
+                          case 0x01:                       // ICMP - ECHO??
+                              printf(" IPV4 payload data type %d\n",ipV4.Protocol );
+                              break;
+                          case 0x06:                       // TCP
+                              printf(" IPV4 payload data type %d\n",ipV4.Protocol );
+                              break;
+                          case 0x11:                       // UDP
+                              {
+                                  UDP_Hdr *p_udp_hdr;
+                                  printf(" IPV4 / UDP data type %d\n",ipV4.Protocol );
+                                  p_udp_hdr = ( UDP_Hdr *) l4_ptr;
+                                  printUDP_Hdr(p_udp_hdr);
+                              }
+                              break;
+                          case 0x2f:                       // GRE
+                              printf(" IPV4 payload data type %d\n",ipV4.Protocol );
+                              break;
+                          case 0x32:                       // IPSEC
+                              printf(" IPV4 payload data type %d\n",ipV4.Protocol );
+                              break;
+                          default:                       // TCP
+                              printf(" Unrecognized IPV4 payload data type %d\n",htons(ipV4.Protocol ));
+                              break;
+                         } // end switch - IPV4 protocol
 
-                     core_counter = g_print_interval;
-                     print_rte_event(0,"RTE_EVENT_TYPE_ETHDEV",&events[i] );                 
+                  }  // end ipv4 packet
+                  else  
+                  {
+                      printf("  L2 Packet - ethtype    received:  0x%04x \n",htons(l2_hdr.EtherType ));
+                      printf("   Consider adding help for this type of packet \n");
+                  } // end else  Not arp.
 
-                     printf("%d< got packet  Stream  flow_id: 0x%05x  queue_id: %d, port_id %d\n",
-                                                                      lcore_id,
-                                                                      events[i].flow_id,
-                                                                      events[i].queue_id,
-                                                                      event_port_id );
-
-// http://doc.dpdk.org/guides/sample_app_ug/ipv4_multicast.html?highlight=indirect%20buffers
-// lets do a simple multicast first  
-
-                  // figure out how to send a subsection of the mbuf. 
-
-                     if(g_verbose > 3)
-                     {
-                         buf = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
-                         PrintBuff((uint8_t*) buf, 0x100 , buf ,"rte_eth_header:");
-                     }
-                     if(g_verbose > 4)
-                     {
-                         PrintBuff((uint8_t*) p_mbuff, (0x100 + p_mbuff->pkt_len + 0x10) , (unsigned char *)p_mbuff ,"mbuff Raw Buffer");
-                         print_rte_mbuf(0,p_mbuff);
-                     }
-                     if(g_verbose > 2)
-                     {
-                         printf(" rx_pkt_cnt: %lu \n",g_rx_packet_cnt[lcore_id]);
-                     }
-                 }
 //<FS>
                  if ( g_drop_all_traffic  == 1)
                  {
-                       
-                       rte_pktmbuf_free( events[i].mbuf  );
+                     rte_pktmbuf_free( events[i].mbuf  );
                  }
                  else
                  {
@@ -652,7 +723,7 @@ int test_loop( __attribute__((unused)) void * arg)
                  }    
 
             } // end event - packet
-            else
+            else  // any event type not covered above
             {
                        
                  printf("  c%d) unrecognized event  %d \n",lcore_id,events[i].event_type);

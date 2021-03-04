@@ -346,26 +346,29 @@ void printMAC_Hdr_t(MAC_Hdr_t *hdr)
 {
     uint16_t eth_type;
     printf("\n");
-    printf("MAC Header:\n ");
-    printMAC( &(hdr->DstMac)   ,"DesMacAddr");
-    printMAC( &(hdr->SrcMac)   ,"SrcMacAddr");
+    printf("    MAC Header:    {\n         ");
+    printMAC( &(hdr->DstMac)   ," DesMacAddr");
+    printf("        ");
+    printMAC( &(hdr->SrcMac)   ," SrcMacAddr");
     if(hdr->Q802_3 == 0)
     {
-       printf(" %d        Q802.3 Number of VLANs \n ",hdr->Q802_3);
+       printf("        %d        Q802.3 Number of VLANs \n ",hdr->Q802_3);
     }
     else
     {
-       printf(" %d:%s - %s  VLAN DETECTED AND I DO NOT HANDLE\n ",__LINE__,__FILE__,__FUNCTION__);
+       printf("        %d:%s - %s  VLAN DETECTED AND I DO NOT HANDLE\n ",__LINE__,__FILE__,__FUNCTION__);
     }
      eth_type=SWAP_16(hdr->EtherType);
-     printf("0x%04x  EtherType:",eth_type);
-     if     (eth_type == IPV4_PKT) printf(" IPV4\n ");            /* 0x0800 */
-     else if(eth_type == IPV6_PKT) printf(" IPV6\n ");            /* 0x86dd */
-     else if(eth_type == Q802_PKT) printf(" VLAN Tag Header\n "); /* 0x0801 */
-     else if(eth_type == ARP_PKT ) printf(" ARP\n");              /* 0x0806 */
-     else if(eth_type == SPN_TREE) printf(" Spanning Tree\n");    /* 0x0027 */
-     else if(eth_type == LLDP_PKT) printf(" Link Layer Discovery Protocol\n");    /* 0x88cc */
+     printf("        0x%04x   EtherType: ",eth_type);
+     if     (eth_type == IPV4_PKT) printf("IPV4\n ");            /* 0x0800 */
+     else if(eth_type == IPV6_PKT) printf("IPV6\n ");            /* 0x86dd */
+     else if(eth_type == Q802_PKT) printf("VLAN Tag Header\n "); /* 0x0801 */
+     else if(eth_type == ARP_PKT ) printf("ARP\n");              /* 0x0806 */
+     else if(eth_type == SPN_TREE) printf("Spanning Tree\n");    /* 0x0027 */
+     else if(eth_type == LLDP_PKT) printf("Link Layer Discovery Protocol\n");    /* 0x88cc */
      else                              printf(" Unrecognized MAC Frame\n");
+     printf("        0x%02x    hdr_sz \n",hdr->hdr_sz);
+     printf("    }\n");
 //     printf("0x%08x  CRC32 -- not determined\n",hdr->CRC32);
      printf("\n");
 }
@@ -379,7 +382,8 @@ int GetMacData(uint8_t * pMACStart, MAC_Hdr_t *ExtractedData)
 
     // First 12 bytes are destination and source MAC address
     // not clear if compiler will keep the MAC_Hdr_t data packed
-    r = 12;
+    //  2 bytes are ethtype.  We add bytes if we find vlans
+    r = 12 + 2; 
     ptr = (char *) &(ExtractedData->DstMac.addr[0]);
     for( i = 0 ; i < sizeof(MacAddr_t) ; i++)
     {
@@ -408,7 +412,7 @@ int GetMacData(uint8_t * pMACStart, MAC_Hdr_t *ExtractedData)
         pMACStart+=2;
         ExtractedData->vlan_1 = *((unsigned short *)pMACStart);
         pMACStart+=2;
-    }
+    }    
     ExtractedData->EtherType = *((unsigned short *)pMACStart);
     ExtractedData->hdr_sz =  r;
     return 0;

@@ -175,7 +175,7 @@ void macString(char mac[],char * string);
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////IPv4//////////////////////////////////////////
+////////////////////////////////////////// l3 - IPv4  ///////////////////////////////////
 //IP Header
 typedef struct
 {
@@ -183,7 +183,7 @@ typedef struct
     uint8_t   HeaderLength;    /*            Length 4 */
 
     uint8_t   DiffSrv;         /* DiffServ6  Congestion notification 2 */
-    uint8_t   Congestion;         /* DiffServ6  Congestion notification 2 */
+    uint8_t   Congestion;      /* DiffServ6  Congestion notification 2 */
 
     uint16_t  TotalLength;     /* lengh of the header and the IP Payload */
     uint16_t  Identification;
@@ -218,7 +218,7 @@ extern int GetIPv4HeaderSize(uint8_t * pIPv4Start);
 
 
 //////////////////////////////////////////////////////////////////////////
-//////////////////////////// ARP /////////////////////////////////////////
+//////////////////////////// l3 - ARP /////////////////////////////////////////
 
 typedef struct __attribute__((__packed__)) {
     uint16_t HwType;
@@ -255,6 +255,28 @@ extern  void printArpPktData_t(ArpPktData_t *hdr);
         0x0020:  e4a7 a031 47d7 c0a8 0105 0000 0000 0000
         0x0030:  0000 0000 0000 0000 0000 0000
 #endif
+
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////// l3 - ipv4 - ICMP ////////////////////////////
+
+typedef struct __attribute__((__packed__)) {
+    uint16_t HwType;
+    uint16_t Protocol;
+    uint16_t  HwAddLen;
+    uint16_t  ProtocolAddLen;
+    uint16_t OpCode;
+    MacAddr_t  SrcHwAddr;
+    uint32_t  SrcProtocolAddr;
+    MacAddr_t  TarHwAddr;
+    uint32_t  TarProtocolAddr;
+}ICMPPktData_t;
+
+
+//extern  void printICMP_PktData_t(ArpPktData_t *hdr);
+
+
+
+
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
