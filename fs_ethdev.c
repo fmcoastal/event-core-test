@@ -48,6 +48,7 @@
 #include "fs_extras.h"
 #include "fs_tstamp.h"
 #include "fs_lpm_test.h"
+#include "fs_net_common.h"
 #include "fs_ethdev.h"
 
 #include <rte_event_timer_adapter.h>   // for event timer
@@ -64,7 +65,6 @@
 #include "fs_core.h"
 #include "fs_eventdev_timer.h"
 #include "fprintbuff.h"
-#include "fs_net_common.h"
 
 #include "fs_global_vars.h"
 
@@ -74,6 +74,15 @@ extern uint64_t  g_core_messages;
 extern int64_t g_print_interval;
 
 uint64_t  g_rx_packet_cnt[32] = {0};
+
+extern int g_drop_all_traffic ;
+uint32_t  g_IP_eth0 =  0xc0a80364 ;    // 192.168.3.100
+MacAddr_t g_Mac_eth0 ={.addr[0]=0x00,
+                       .addr[1]=0x0f,
+                       .addr[2]=0xb7,
+                       .addr[3]=0x06,
+                       .addr[4]=0x10,
+                       .addr[5]=0xf3};
 
 
 void print_eth_setup(void);
@@ -169,9 +178,6 @@ o-------------> | |    flow 1   | |      |
 
 // I will start with 4 cores,  ports, and 4 queues.
 //       maybe later, i will increase the number of queues and try to inject a timer event.
-
-
-extern const char * StringSched[];    // defined in fs_core.c
 
 
 extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core time stamp

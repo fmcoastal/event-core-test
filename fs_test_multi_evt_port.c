@@ -48,6 +48,7 @@
 #include "fs_extras.h"
 #include "fs_tstamp.h"
 #include "fs_lpm_test.h"
+#include "fs_net_common.h"
 #include "fs_ethdev.h"
 
 #include <rte_event_timer_adapter.h>   // for event timer
@@ -63,8 +64,9 @@
 #include "fs_print_rte_ethdev_struct.h"
 #include "fs_eventdev_timer.h"
 #include "fs_core.h"
-#include "fs_net_common.h"
 #include "fs_global_vars.h"
+#include "main.h"
+
 
 //#include "fs_print_rte_structures.h"
 
@@ -75,10 +77,20 @@ void print_test_setup(void);
 void print_test_setup(void)
 {
 printf("\n"
+"fs_test_mult_evt_port  \n"
+"\n"
+"  ---------------          ------------          ------------                \n"
+"  |eth port_id 0| -------  |evt_que 0 | --   >   | evt_prt 0| \\             \n"
+"  ---------------          ------------          ------------  \\            \n"
+"                                                                \\           \n" 
 "  ---------------          ------------          ------------     ---------  \n"
-"  |eth port_id 0| -------  |evt_que 0 | --   >   | evt_prt 0| --> | core 20| \n"
+"  |eth port_id 1| -------  |evt_que 1 | --   >   | evt_prt 1| --> | core 20| \n"
 "  ---------------          ------------          ------------     ---------  \n"
-"                                                                             \n" 
+"                                                                /            \n"
+"  ---------------          ------------          ------------  /             \n"
+"  |eth port_id 2| -------  |evt_que 2 | --   >   | evt_prt 2| /              \n"
+"  ---------------          ------------          ------------                \n"
+"                                                                             \n"
 "                                                                             \n"
 "\n");
 }
@@ -87,8 +99,6 @@ printf("\n"
 // I will start with 4 cores,  ports, and 4 queues.
 //       maybe later, i will increase the number of queues and try to inject a timer event.
 
-
-extern const char * StringSched[];    // defined in fs_core.c
 
 
 extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core time stamp
@@ -131,7 +141,7 @@ int test_setup( __attribute__((unused)) void * arg)
    print_test_setup(); 
 
 
-    g_glob.enabled_eth_port_mask = 0x03 ;            // cmd line -p argument - here I hardwired :-0    
+    g_glob.enabled_eth_port_mask = 0x07 ;            // cmd line -p argument - here I hardwired :-0    
     g_glob.nb_eth_ports_available = 0;               // calculated based on  g_glob.enabled_port_mask
     g_glob.event_dev_id = 0;                           // event dev_id index/handle => SSO  0
 
@@ -141,19 +151,19 @@ int test_setup( __attribute__((unused)) void * arg)
          g_glob.def_p_conf.new_event_threshold = -1;
 
     // event queues & ports
-    g_glob.evq.nb_queues = 1 ;  // total number of event queues in my design
-    g_glob.evp.nb_ports  = 1 ;  // total number of event ports in my design.  
+    g_glob.evq.nb_queues = 3 ;  // total number of event queues in my design
+    g_glob.evp.nb_ports  = 3 ;  // total number of event ports in my design.  
 
 
     // adapters rx 
     g_glob.rx_adptr.nb_rx_adptr     = 1 ;  // total number of rx_adapters in my design
-    g_glob.rx_adptr.nb_rx_adptr_add = 1 ;  // total number of rx_adapter_adds
+    g_glob.rx_adptr.nb_rx_adptr_add = 3 ;  // total number of rx_adapter_adds
 
 
 
     // adapters tx 
     g_glob.tx_adptr.nb_tx_adptr = 1 ;      // total number of tx_adapters in my design.  
-    g_glob.tx_adptr.nb_tx_adptr_add = 1 ;  // total number of rx_adapter_adds
+    g_glob.tx_adptr.nb_tx_adptr_add = 3 ;  // total number of rx_adapter_adds
 
 
 
@@ -234,6 +244,21 @@ int test_setup( __attribute__((unused)) void * arg)
                                             event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
     ( ptr + 0 )->ev_q_conf.priority = 0x80;
 
+// queue 1
+    ( ptr + 1 )->event_q_id    = 1;         // event queue index
+    ( ptr + 1 )->to_event_port = 1;         // event port this queue feeds
+    ( ptr + 1 )->ev_q_conf.event_queue_cfg = RTE_EVENT_QUEUE_CFG_ALL_TYPES;
+    ( ptr + 1 )->ev_q_conf.schedule_type = 0;  /*  dont care when   
+                                            event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
+    ( ptr + 1 )->ev_q_conf.priority = 0x80;
+
+// queue 2
+    ( ptr + 2 )->event_q_id    = 2;         // event queue index
+    ( ptr + 2 )->to_event_port = 2;         // event port this queue feeds
+    ( ptr + 2 )->ev_q_conf.event_queue_cfg = RTE_EVENT_QUEUE_CFG_ALL_TYPES;
+    ( ptr + 2 )->ev_q_conf.schedule_type = 0;  /*  dont care when   
+                                            event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
+    ( ptr + 2 )->ev_q_conf.priority = 0x80;
 
 }
 
@@ -244,11 +269,23 @@ int test_setup( __attribute__((unused)) void * arg)
 //       queues and the queue priority        
 
 
- // port 0  - two queues (0 and 1), queue Priority 0x80 and 0x40
+// event port 0  -  queue 0 ), queue Priority 0x80 and 0x40
    (g_glob.evp.event_p_id + 0)->nb_links = 1;
-   (g_glob.evp.event_p_id + 0)->q_id[0] = 0;
+   (g_glob.evp.event_p_id + 0)->q_id[0] = 0;    // event_queue_id
    (g_glob.evp.event_p_id + 0)->pri[0]  = 80;
  
+// event port 1  -  queue 1 ), queue Priority 0x80 and 0x40
+   (g_glob.evp.event_p_id + 1)->nb_links = 1;
+   (g_glob.evp.event_p_id + 1)->q_id[0] = 1;
+   (g_glob.evp.event_p_id + 1)->pri[0]  = 80;
+ 
+// event port 2  -  queue 2 ), queue Priority 0x80 and 0x40
+   (g_glob.evp.event_p_id + 2)->nb_links = 1;
+   (g_glob.evp.event_p_id + 2)->q_id[0] = 2;
+   (g_glob.evp.event_p_id + 2)->pri[0]  = 80;
+ 
+
+
 
 //  You should only really need one adapter.  
 
@@ -280,18 +317,41 @@ int test_setup( __attribute__((unused)) void * arg)
     g_glob.rx_adptr.rx_adptr_add[0].sched_type = RTE_SCHED_TYPE_ORDERED;        // 
     g_glob.rx_adptr.rx_adptr_add[0].priority = 0x80;        // 
 
+// rx_adapter 0  connects eth dev 1/port 0 to event queue 1
+    g_glob.rx_adptr.rx_adptr_add[1].adapter_id = 0 ;     // 
+    g_glob.rx_adptr.rx_adptr_add[1].eth_dev_port = 1 ;   // 
+    g_glob.rx_adptr.rx_adptr_add[1].eth_dev_queue = 0 ;  // 
+    g_glob.rx_adptr.rx_adptr_add[1].event_dev_queue = 1; // 
+    g_glob.rx_adptr.rx_adptr_add[1].sched_type = RTE_SCHED_TYPE_ORDERED;        // 
+    g_glob.rx_adptr.rx_adptr_add[1].priority = 0x80;        // 
+
+// rx_adapter 0  connects eth dev 2/port 0 to event queue 2
+    g_glob.rx_adptr.rx_adptr_add[2].adapter_id = 0 ;     // 
+    g_glob.rx_adptr.rx_adptr_add[2].eth_dev_port = 2 ;   // 
+    g_glob.rx_adptr.rx_adptr_add[2].eth_dev_queue = 0 ;  // 
+    g_glob.rx_adptr.rx_adptr_add[2].event_dev_queue = 2; // 
+    g_glob.rx_adptr.rx_adptr_add[2].sched_type = RTE_SCHED_TYPE_ORDERED;        // 
+    g_glob.rx_adptr.rx_adptr_add[2].priority = 0x80;        // 
 
 
 //    g_glob.tx_adptr.nb_tx_adptr_adds = 2;
 
     g_glob.tx_adptr.tx_adptr[0]  = 0 ; //  .
 
-// rx_adapter 0  connects eth dev 0/port 0 to event queue 0
+// rx_adapter 0  connects eth port_id(dev) 0/queue 0 to event queue 0
     g_glob.tx_adptr.tx_adptr_add[0].adapter_id = 0 ;     // 
     g_glob.tx_adptr.tx_adptr_add[0].eth_dev_port = 0 ;   // 
     g_glob.tx_adptr.tx_adptr_add[0].eth_dev_queue = 0 ;  // 
 
+// rx_adapter 0  connects eth port_id(dev)1 / queue 0 to event queue 0
+    g_glob.tx_adptr.tx_adptr_add[1].adapter_id = 0 ;     // 
+    g_glob.tx_adptr.tx_adptr_add[1].eth_dev_port = 1 ;   // 
+    g_glob.tx_adptr.tx_adptr_add[1].eth_dev_queue = 0 ;  // 
 
+// rx_adapter 0  connects eth port_id(dev)2 / queue 0 to event queue 0
+    g_glob.tx_adptr.tx_adptr_add[2].adapter_id = 0 ;     // 
+    g_glob.tx_adptr.tx_adptr_add[2].eth_dev_port = 2 ;   // 
+    g_glob.tx_adptr.tx_adptr_add[2].eth_dev_queue = 0 ;  // 
 
 // INFO
    printf("rte_event_dev_count() = %d \n",rte_event_dev_count());
@@ -426,6 +486,49 @@ int test_setup( __attribute__((unused)) void * arg)
 
 
 
+/////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//////  Handle CPU Messages
+/////////////////////////////////////////////////////////////////////////////////////////////////
+uint8_t  g_core_2_next_message[]      = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 };
+uint8_t  g_core_2_evt_port_id[]       = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 };
+uint8_t  g_core_2_next_evt_queue_id[] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 };
+ 
+static inline void Do_Event_Type_CPU( struct rte_event * p_event, unsigned lcore_id,uint8_t event_port_id );
+static inline void Do_Event_Type_CPU( struct rte_event * p_event, unsigned lcore_id,uint8_t event_port_id )
+{
+     int ret;
+     printf("****    c%d) Received CPU event from evt_port_id %d**** \n",lcore_id,event_port_id);
+     print_rte_event( 0, "event[i]",p_event);
+     printf(" Message:   %s\n",(char *)p_event->event_ptr);
+     
+     printf("  c%d) Send message to next Port (aka core for me)  next_queue: %d \n",lcore_id
+                                             ,g_core_2_next_evt_queue_id[lcore_id]);
+     
+     // set to forward to next core.
+     p_event->queue_id       = g_core_2_next_evt_queue_id[lcore_id];
+     // set operation to forward packet    
+     p_event->op             = RTE_EVENT_OP_FORWARD;  // this for some reason stops the event form forwarding
+     p_event->flow_id        += 1;
+     p_event->priority        = 0x40 ; 
+     p_event->event_ptr       = (void *)core_message[g_core_2_next_message[lcore_id]] ; 
+     
+     // print_rte_event( 0, "event[i]",&events[i]);
+     rte_pause();
+     usleep(500000);     
+
+     ret = rte_event_enqueue_burst(g_glob.event_dev_id, g_core_2_evt_port_id[lcore_id],
+                         p_event , 1);
+     if( ret != 1 )
+     {
+          printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
+          printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
+          rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
+     }
+ 
+}
+
+
 #define LOCK_LOOPS (10*10)
 #define BATCH_SIZE  4
 
@@ -443,13 +546,8 @@ int test_loop( __attribute__((unused)) void * arg)
    
     struct rte_event events[BATCH_SIZE];
     uint16_t nb_rx; 
-    // because my event device is 1 core to 1 port to 1 queue,  the table below is a
-    //     a simple bit ot
-    uint8_t  core_2_next_message[]      = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 };
-    uint8_t  core_2_evt_port_id[]       = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 };
-    uint8_t  core_2_next_evt_queue_id[] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 };
-    uint16_t ret;
     int core_counter = 0;
+    uint8_t event_port_poll_index = 0;  
 
     if( ! ( rte_lcore_is_enabled(23)  ))
     {
@@ -459,13 +557,13 @@ int test_loop( __attribute__((unused)) void * arg)
 
     lcore_id       = rte_lcore_id();             // my core index
     event_dev_id   = g_glob.event_dev_id;          // id of my event device
-    event_port_id  = core_2_evt_port_id[ lcore_id ]; // for now, I have 1 port associated with 1 core.  
+    event_port_id  = g_core_2_evt_port_id[ lcore_id ]; // for now, I have 1 port associated with 1 core.  
 
 
     if(  lcore_id == 23 )  
     {
           
-
+         g_drop_all_traffic = 1;
     }
 
     if( (lcore_id == 23 )  && ( g_core_messages == 1))
@@ -528,215 +626,213 @@ int test_loop( __attribute__((unused)) void * arg)
     {
        // lots of handwaving here.  there should be only one event 
        //    put in before the Event loop
+            event_port_poll_index++;
+            if (event_port_poll_index >= 3 ) event_port_poll_index =0;
  
-        nb_rx = rte_event_dequeue_burst(event_dev_id, event_port_id,
-                                events, RTE_DIM(events), 0);
-
-        if (nb_rx == 0) 
-        {
-            rte_pause();
-            continue;
-        }
-        for(i = 0 ; i < nb_rx ; i++)
-        {
-   
-////////////////////
-// switch through the event types
-//////////////////// 
-            if( events[i].event_type == RTE_EVENT_TYPE_CPU )
-            {     
- 
-                 printf("****    c%d) Received %d CPU events from evt_port_id %d**** \n",lcore_id,nb_rx,event_port_id);
-                 print_rte_event( 0, "event[i]",&events[i]);
-                 printf(" Message:   %s\n",(char *)events[i].event_ptr);
-                 
-                 printf("  c%d) Send message to next Port (aka core for me)  next_queue: %d \n",lcore_id
-                                                         ,core_2_next_evt_queue_id[lcore_id]);
-                 
-                 // set to forward to next core.
-                 events[i].queue_id       = core_2_next_evt_queue_id[lcore_id];
-                 // set operation to forward packet    
-                 events[i].op             = RTE_EVENT_OP_FORWARD;  // this for some reason stops the event form forwarding
-                 events[i].flow_id        += 1;
-                 events[i].priority        = 0x40 ; 
-                 events[i].event_ptr       = (void *)core_message[core_2_next_message[lcore_id]] ; 
-                 
-                 // print_rte_event( 0, "event[i]",&events[i]);
-                 rte_pause();
-                 usleep(500000);     
-
-                 ret = rte_event_enqueue_burst(event_dev_id, core_2_evt_port_id[lcore_id],
-                                     &(events[i]) , 1);
-                 if( ret != 1 )
-                 {
-                      printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
-                      printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
-                      rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
-                 }
-            }
-           else if (events[i].event_type == RTE_EVENT_TYPE_ETHDEV )  // event -> etherent packet 
+            nb_rx = rte_event_dequeue_burst(event_dev_id, event_port_poll_index,
+                                    events, RTE_DIM(events), 0);
+    
+            if (nb_rx == 0) 
             {
+                continue;
+            }
+            for(i = 0 ; i < nb_rx ; i++)
+            {
+       
+                VERBOSE_M( EVENT_MESSAGES ) printf("%s Received Event: 0x%02x  (events[i].event_type) %s\n",C_BLUE,events[i].event_type,     C_NORMAL );                 
+                VERBOSE_M( EVENT_DETAILS )  print_rte_event(0,"RTE_EVENT: ",&events[i] );                 
+//////$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////// switch through the event types
+//////$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+                switch (events[i].event_type) {
+//$$$$$$$$
+//$$$$$$$$  Event type - CPU
+//$$$$$$$$
+#if 0
+                case RTE_EVENT_TYPE_CPU:
+                     Do_Event_Type_CPU( &events[i] , lcore_id, event_port_id );
 
-//<FS>
-                  struct rte_mbuf *  p_mbuff = events[i].mbuf ;    // fish out the mbuff pointer.
-                  uint8_t *          l4_ptr;
-                  uint8_t *          l3_ptr;
-                  uint8_t *          l2_ptr;   // pointer to the l2 header.       
-                  MAC_Hdr_t          l2_hdr;   // MAC_HDR_T is not memory aligned to an l2 header.  
-                                               //   the structure has header size and saves vlans
-                                               //   if it find them in the header. 
-                  g_rx_packet_cnt[lcore_id]++; // increment stats 
-                  core_counter--;              //  core counter used to print every "p" packets
-////////////////////
-// Print Packet Info
-//////////////////// 
-                  if ((  core_counter <= 0 ) && (g_print_interval > 0))
-                  {
-                      core_counter = g_print_interval;
-                      print_rte_event(0,"RTE_EVENT_TYPE_ETHDEV",&events[i] );                 
-                      printf("%d< Received RTE_EVENT_TYPE_ETHDEV   flow_id: 0x%05x  queue_id: %d, port_id %d\n",
-                                                                   lcore_id,
-                                                                   events[i].flow_id,
-                                                                   events[i].queue_id,
-                                                                   event_port_id );
-      
-                      if(g_verbose > 3)
-                      {
-                          l2_ptr = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
-                          PrintBuff((uint8_t*) l2_ptr, 0x100 , l2_ptr ,"rte_eth_header:");
-                      }
-                      if(g_verbose > 4)
-                      {
-                          PrintBuff((uint8_t*) p_mbuff, (0x100 + p_mbuff->pkt_len + 0x10) , (unsigned char *)p_mbuff ,"mbuff Raw Buffer");
-                          print_rte_mbuf(0,p_mbuff);
-                      }
-                      if(g_verbose > 2)
-                      {
-                          printf(" rx_pkt_cnt: %lu \n",g_rx_packet_cnt[lcore_id]);
-                      }
-                  }  // end print packet info
-
-////////////////////////
-// parse out packet info
-/////////////////////////
-                  // fish out some packet data
-                  l2_ptr = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
-                  
-                  GetMacData(l2_ptr,&l2_hdr);           // fish the field info out of the data
-                  printMAC_Hdr_t(&l2_hdr);              // print the header
-                  l3_ptr =  l2_ptr +  l2_hdr.hdr_sz;    // mover pointer forward to point to l3 info 
-
-
-                  printf("  l2_hdr.EtherType   0x%04x   htons(0x0806) 0x%04x \n", l2_hdr.EtherType ,  htons(0x0806));
-
-                  if( l2_hdr.EtherType == htons(0x0806) ) /* ARP - ICMP */
-                  {
-                       uint32_t  g_IP_eth0 =  0xc0a80364 ;    // 192.168.3.100
-                       MacAddr_t g_Mac_eth0 ={.addr[0]=0x00, .addr[1]=0x0f, 
-                                             .addr[2]=0xb7, .addr[3]=0x06,
-                                             .addr[4]=0x10, .addr[5]=0xf3}; 
-                       
-                       ArpPktData_t * p_arp = (ArpPktData_t *)l3_ptr  ;
-                       printf("%s GOT AN ICMP Packet!! %s \n",C_RED, C_NORMAL);
-                       PrintBuff((uint8_t*) l3_ptr, sizeof(ArpPktData_t) , l3_ptr ,"ArpPktData_t:");
-                       printArpPktData_t(p_arp);
-
-                       if ( ntohl(p_arp->TarProtocolAddr) == g_IP_eth0)
-                       {
-                           ArpPktData_t  d;
-                           
-                           printf("%s IT is for ME!! %s \n",C_RED, C_NORMAL);
-                           
-                           // save off the original
-                            memcpy(&d , p_arp, sizeof(ArpPktData_t));
-                           // move the macs
-                            SetMAC( &(p_arp->SrcHwAddr), &d.TarHwAddr);
-                            SetMAC( &(p_arp->TarHwAddr), &g_Mac_eth0 );
-                            // move the IP address
-                            p_arp->SrcProtocolAddr = d.TarProtocolAddr;
-                            p_arp->TarProtocolAddr = d.SrcProtocolAddr;
-                            // set opcode to response
-                            p_arp->OpCode = htons(0x0002);
-                           
-                            // swap L2_hdr mac addresses
-                            SetMAC(  (MacAddr_t *) l2_ptr       , &d.SrcHwAddr); 
-                            SetMAC(  (MacAddr_t *) (l2_ptr + 6 ), &g_Mac_eth0); 
-
-                            PrintBuff((uint8_t*) l2_ptr, sizeof(ArpPktData_t)+ l2_hdr.hdr_sz , l2_ptr ,"Arp Response:");
-                       }
-                  }
-                  else if (l2_hdr.EtherType == htons(0x0800) ) /* IPV4  */ // process IPV4 packet type
-                  {
-                     IPv4_Hdr_t ipV4;
-                     GetIPv4Data( l3_ptr, &ipV4 ) ;
-                     printIPv4_Hdr_t(  &ipV4);
-
-                     l4_ptr = l3_ptr += (ipV4.HeaderLength * 4)  ;   // point to the L3 Data type
-                     switch ( ipV4.Protocol ) {
-                          case 0x01:                       // ICMP - ECHO??
-                              printf(" IPV4 payload data type %d\n",ipV4.Protocol );
-                              break;
-                          case 0x06:                       // TCP
-                              printf(" IPV4 payload data type %d\n",ipV4.Protocol );
-                              break;
-                          case 0x11:                       // UDP
-                              {
-                                  UDP_Hdr *p_udp_hdr;
-                                  printf(" IPV4 / UDP data type %d\n",ipV4.Protocol );
-                                  p_udp_hdr = ( UDP_Hdr *) l4_ptr;
-                                  printUDP_Hdr(p_udp_hdr);
-                              }
-                              break;
-                          case 0x2f:                       // GRE
-                              printf(" IPV4 payload data type %d\n",ipV4.Protocol );
-                              break;
-                          case 0x32:                       // IPSEC
-                              printf(" IPV4 payload data type %d\n",ipV4.Protocol );
-                              break;
-                          default:                       // TCP
-                              printf(" Unrecognized IPV4 payload data type %d\n",htons(ipV4.Protocol ));
-                              break;
-                         } // end switch - IPV4 protocol
-
-                  }  // end ipv4 packet
-                  else  
-                  {
-                      printf("  L2 Packet - ethtype    received:  0x%04x \n",htons(l2_hdr.EtherType ));
-                      printf("   Consider adding help for this type of packet \n");
-                  } // end else  Not arp.
-
-//<FS>
-                 if ( g_drop_all_traffic  == 1)
-                 {
-                     rte_pktmbuf_free( events[i].mbuf  );
-                 }
-                 else
-                 {
-#ifdef LOOP_CALLS
-                     CALL_RTE("rte_event_eth_tx_adapter_enqueue()");
+                     break;
 #endif
-                     while (!rte_event_eth_tx_adapter_enqueue(event_dev_id,
-                                                              event_port_id,   // here is where I map to other interface??
-                                                    &(events[i]), 1, 0) &&
-                                                   ( g_force_quit != true ) ) 
-                                     ;
-                 }    
+//$$$$$$$$
+//$$$$$$$$  Event type - TIMER
+//$$$$$$$$
+                case RTE_EVENT_TYPE_TIMER:
+                     break;
+//$$$$$$$$
+//$$$$$$$$  Event type - ETHDEV
+//$$$$$$$$
+                case RTE_EVENT_TYPE_ETHDEV:
+                     {
+                         struct rte_mbuf *  p_mbuff = events[i].mbuf ;    // fish out the mbuff pointer.
+                         uint8_t *          l4_ptr;
+                         uint8_t *          l3_ptr;
+                         uint8_t *          l2_ptr;   // pointer to the l2 header.       
+                         MAC_Hdr_t          l2_hdr;   // MAC_HDR_T is not memory aligned to an l2 header.  
+                                                      //   the structure has header size and saves vlans
+                                                      //   if it find them in the header. 
+                         g_rx_packet_cnt[lcore_id]++; // increment stats 
+                         core_counter--;         
+              ////////////////////
+              // Print Packet Info
+              //////////////////// 
+                         if ((  core_counter <= 0 ) && (g_print_interval > 0))
+                         {
+                             core_counter = g_print_interval;
+                             VERBOSE_M( EVENT_ETH_MESSAGES )  print_rte_event(0,"RTE_EVENT_TYPE_ETHDEV",&events[i] );                 
 
-            } // end event - packet
-            else  // any event type not covered above
-            {
-                       
-                 printf("  c%d) unrecognized event  %d \n",lcore_id,events[i].event_type);
-                 printf("  THIS IS A BUG, NOT SURE WHAT TO DO.\n");
-                 print_rte_event(0,"unrecognized event",&events[i] );
-                 
-                 //  rte_pktmbuf_free( events[i].mbuf  );
+                             printf("%d< Received RTE_EVENT_TYPE_ETHDEV   flow_id: 0x%05x  queue_id: %d, port_id %d\n",
+                                                                          lcore_id,
+                                                                          events[i].flow_id,
+                                                                          events[i].queue_id,
+                                                                          event_port_id );
+             
+                             VERBOSE_M(EVENT_ETH_DETAILS )
+                             {
+                                 l2_ptr = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
+                                 PrintBuff((uint8_t*) l2_ptr, 0x100 , l2_ptr ,"rte_eth_header:");
+                                 PrintBuff((uint8_t*) p_mbuff, (0x100 + p_mbuff->pkt_len + 0x10) , (unsigned char *)p_mbuff ,"mbuff Raw Buffer");
+                                 print_rte_mbuf(0,p_mbuff);
+                             }
+                             VERBOSE_M( EVENT_ETH_MESSAGES)
+                             {
+                                 printf(" rx_pkt_cnt: %lu \n",g_rx_packet_cnt[lcore_id]);
+                             }
+                         }  // end print packet info
+               ////////////////////////
+               // parse out packet info
+               /////////////////////////
+                         // fish out some packet data
+                         l2_ptr = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
+                         
+                         GetMacData(l2_ptr,&l2_hdr);                            // fish the field info out of the data
+                         l3_ptr =  l2_ptr +  l2_hdr.hdr_sz;                     // mover pointer forward to point to l3 info 
+                         
+                         VERBOSE_M( ETH_L2_ETH_TYPE ) printf("%s Received  L2.EthType: 0x%04x %s\n",C_RED,(htons(l2_hdr.EtherType)), C_NORMAL);
+                         VERBOSE_M( ETH_L2_DETAILS ) 
+                         { 
+                              printMAC_Hdr_t(&l2_hdr);  // print the header
+                         }
+                         // L2 payload - EthType 
+                         switch (htons(l2_hdr.EtherType)) {
+                             case 0x0806:    /* ARP   */
+                                 {
+                                    
+                                     ArpPktData_t * p_arp = (ArpPktData_t *)l3_ptr  ;
+                                     VERBOSE_M ( ETH_L3_MESSAGES )
+                                         printf("%s Received  L2.EthType: 0x%04x     ICMP Packet!! %s \n",C_RED, 0x0806, C_NORMAL);
+                                      VERBOSE_M ( ETH_L3_DETAILS )
+                                     {
+                                         PrintBuff((uint8_t*) l3_ptr, sizeof(ArpPktData_t) , l3_ptr ,"ArpPktData_t:");
+                                         printArpPktData_t(p_arp);
+                                     }
+                                   
+                                     if ( ntohl(p_arp->TarProtocolAddr) == g_IP_eth0)
+                                     {
+                                         ArpPktData_t  d;
+                                         
+                                         VERBOSE_M( ETH_L3_MESSAGES ) printf("%s IT is for ME!! %s \n",C_RED, C_NORMAL);
+                                         
+                                         // save off the original
+                                          memcpy(&d , p_arp, sizeof(ArpPktData_t));
+                                         // move the macs
+                                          SetMAC( &(p_arp->SrcHwAddr), &d.TarHwAddr);
+                                          SetMAC( &(p_arp->TarHwAddr), &g_Mac_eth0 );
+                                          // move the IP address
+                                          p_arp->SrcProtocolAddr = d.TarProtocolAddr;
+                                          p_arp->TarProtocolAddr = d.SrcProtocolAddr;
+                                          // set opcode to response
+                                          p_arp->OpCode = htons(0x0002);
+                                         
+                                          // swap L2_hdr mac addresses
+                                          SetMAC(  (MacAddr_t *) l2_ptr       , &d.SrcHwAddr); 
+                                          SetMAC(  (MacAddr_t *) (l2_ptr + 6 ), &g_Mac_eth0); 
+                                   
+                                          VERBOSE_M( ETH_L3_DETAILS )  PrintBuff((uint8_t*) l2_ptr, sizeof(ArpPktData_t)+ l2_hdr.hdr_sz , l2_ptr ,"Arp Response:");
+                                     }
+                                 }
+                                 break;
+                             case 0x0800:    /* IPV4  */
+                                {
+                                   IPv4_Hdr_t ipV4;
+                                   GetIPv4Data( l3_ptr, &ipV4 ) ;
  
-            }
-        }   // end for i -> nb_events 
-    }  // end while
+                                   VERBOSE_M( ETH_L3_DETAILS )    printIPv4_Hdr_t(  &ipV4);
+                        
+                                   l4_ptr = l3_ptr += (ipV4.HeaderLength * 4)  ;   // point to the L3 Data type
+                                   switch ( ipV4.Protocol ) {
+                                        case 0x01:                       // ICMP - ECHO??
+                                            VERBOSE_M(ETH_L3_IPV4_MESSAGES)  printf(" IPV4 Protocol:  ICMP  0x%04x\n",ipV4.Protocol );
+                                            break;
+                                        case 0x06:                       // TCP
+                                            VERBOSE_M(ETH_L3_IPV4_MESSAGES)  printf(" IPV4 Protocol:  TCP 0x%04x \n",ipV4.Protocol );
+                                            break;
+                                        case 0x11:                       // UDP
+                                            VERBOSE_M(ETH_L3_IPV4_MESSAGES)printf(" IPV4 Protocol:  UDP 0x%04x  event_port_id %d \n",ipV4.Protocol,event_port_poll_index );
+                                            {
+                                                UDP_Hdr *p_udp_hdr;
+                                                p_udp_hdr = ( UDP_Hdr *) l4_ptr;
+                                                VERBOSE_M(ETH_L4_UDP_DETAILS ) printUDP_Hdr(p_udp_hdr);
+                                            }
+                                            break;
+                                        case 0x2f:                       // GRE
+                                            VERBOSE_M(ETH_L3_IPV4_MESSAGES) printf(" IPV4 Protocol:  GRE 0x%04x \n",ipV4.Protocol );
+                                            break;
+                                        case 0x32:                       // IPSEC
+                                            VERBOSE_M(ETH_L3_IPV4_MESSAGES) printf(" IPV4 Protocol:  IPSEC 0x%04x\n",ipV4.Protocol );
+                                            break;
+                                        default:                       // TCP
+                                            VERBOSE_M(ETH_L3_IPV4_MESSAGES)  printf(" Unrecognized IPV4 Protocol:  %d\n",htons(ipV4.Protocol ));
+                                            break;
+                                       } // end switch - IPV4 protocol
+                        
+                                 }  // end ipv4 packet
+                                 break;
+                             case 0x86dd:    /* IPV6 */
+                             default:
+                                 VERBOSE_M (ETH_L3_MESSAGES ) printf("%s Received  L2.EthType: 0x%04x  -- UNKNOWN / Unhandled -- %s \n",C_RED, 0x86dd, C_NORMAL);
+                                 break;
+                         } // end switch EthType  
+                         // Disposition the packet. 
+                         if ( g_drop_all_traffic  == 1)
+                         {
+                             
+                             rte_pktmbuf_free( events[i].mbuf  );
+                         }
+                         else
+                         {
+#ifdef LOOP_CALLSSSS
+                             CALL_RTE("rte_event_eth_tx_adapter_enqueue()");
+#endif              
+                             while (!rte_event_eth_tx_adapter_enqueue(event_dev_id,
+                                                                      event_port_id,   // here is where I map to other interface??
+                                                            &(events[i]), 1, 0) &&
+                                                           ( g_force_quit != true ) ) ;
+                         }    
+     
+     
+    
+    
+                     }
+                     break;  // end event typ ETH
+    
+//////$$$$$$$$
+//////$$$$$$$$  Event type - UNRECOGNIZED
+//////$$$$$$$$
+                default:
+                     printf("  c%d) unrecognized event  %d \n",lcore_id,events[i].event_type);
+                     printf("  THIS IS A BUG, NOT SURE WHAT TO DO.\n");
+                     print_rte_event(0,"unrecognized event",&events[i] );
+                     break;
+               } // end switch -> *event type )
+    
+            }   // end for i -> nb_events
+       
+    }  // end while( g_force != 0 }
     return 0;
 }
+
+
 
 int test_print(__attribute__((unused)) void * arg)
 {

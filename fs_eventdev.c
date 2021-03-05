@@ -17,6 +17,9 @@
 
 
 
+const char * StringSched[] = {"RTE_SCHED_TYPE_ORDERED",
+                              "RTE_SCHED_TYPE_ATOMIC",
+                              "RTE_SCHED_TYPE_PARALLEL"};
 
 
 
@@ -320,8 +323,8 @@
  #ifdef PRINT_CALL_ARGUMENTS
          FONT_CALL_ARGUMENTS_COLOR();
 
-              printf("       port# %d \n",port);
-              printf("           number of queues  %d \n",array_sz);
+              printf("      event_port# %d \n",port);
+              printf("           number of event_queues  %d \n",array_sz);
               for (index = 0 ; index < array_sz  ; index++)
               {
                     printf("            %d) queue_id %d  queue_prioity %d\n",index

@@ -133,10 +133,6 @@ o-------------> | |    flow 1   | |      |
 //       maybe later, i will increase the number of queues and try to inject a timer event.
 
 
-const char * StringSched[] = {"RTE_SCHED_TYPE_ORDERED",
-                              "RTE_SCHED_TYPE_ATOMIC",
-                              "RTE_SCHED_TYPE_PARALLEL"};
-
 
 extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core time stamp
 extern uint64_t  g_per_core_result[]; // per core time stamp

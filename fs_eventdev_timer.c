@@ -51,6 +51,7 @@
 #include "fs_extras.h"
 #include "fs_tstamp.h"
 #include "fs_lpm_test.h"
+#include "fs_net_common.h"
 #include "fs_ethdev.h"
 #include "fs_eventdev.h"
 
@@ -123,9 +124,6 @@ printf("\n"
 
 // I will start with 4 cores,  ports, and 4 queues.
 //       maybe later, i will increase the number of queues and try to inject a timer event.
-
-
-extern const char * StringSched[];    // defined in fs_core.c
 
 
 extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core time stamp

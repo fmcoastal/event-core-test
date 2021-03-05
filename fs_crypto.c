@@ -150,7 +150,6 @@ void crypto_description( void);
 
 
 // FIGURE OUT THE four VARIABLE BELOW LATER
-extern const char * StringSched[];
 extern uint8_t g_evt_dev_id;    // this variable should be moved out of the fs_core file to a global evnet_dev_id for 
 int g_cdev_id=0;                  // device id of the crypto device.   
                                 // all eveent devices using the same SSO instance....
