@@ -256,25 +256,6 @@ main(int argc, char **argv)
         printf("  -v on cmd line should be a hex value\n");
         printf("g_verbose= 0x%016lx\n",g_verbose);
 
-
-        // print eth port ids  that rte_init sees
-        {  
-            char     string[64];
-            int16_t  eth_port_id;
-        
-            printf("rte_eal_init() thinks I have the following ethdev device\n");
-            RTE_ETH_FOREACH_DEV(eth_port_id) 
-            {
-                /* get (-ENODEV) or (-EINVAL) if port_id is invalid. */
-                if ( rte_eth_dev_get_name_by_port( eth_port_id , string) == 0)
-                {
-                    printf("  ----> portid 0x%x enabled PCIe:  %s \n",eth_port_id,string );
-                }
-            }
-        }
-
-
-
         // configure for the test to run. 
         setup_test_funtions();
 

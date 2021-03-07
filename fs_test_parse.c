@@ -48,6 +48,7 @@
 #include "fs_extras.h"
 #include "fs_tstamp.h"
 #include "fs_lpm_test.h"
+#include "fs_net_common.h"
 #include "fs_ethdev.h"
 
 #include <rte_event_timer_adapter.h>   // for event timer
@@ -77,20 +78,16 @@ void print_test_setup(void)
 printf("\n"
 " %s \n"
 
-"  ---------------          ------------          ------------     ---------  \n"
-"  |eth port_id 0| -------  |evt_que 0 | --   >   | evt_prt 0| --> | core 20| \n"
-"  ---------------          ------------          ------------     ---------  \n"
-"                                                                             \n" 
-"                                                                             \n"
-"\n",__FILE_NAME__);
+"  ---------------        ------------      -------------     ----------- \n"
+"  |eth port_id 0| ---->  |evt_que 0 | ---> | evt_prt 0 | --> | core 23 | \n"
+"  ---------------        ------------      -------------     ----------- \n"
+"                                                                         \n" 
+"                                                                         \n"
+"\n",__FILE__);
 }
 
 
 // I will start with 4 cores,  ports, and 4 queues.
-//       maybe later, i will increase the number of queues and try to inject a timer event.
-
-
-extern const char * StringSched[];    // defined in fs_core.c
 
 
 extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core time stamp
@@ -108,16 +105,6 @@ extern uint64_t  g_per_core_result[]; // per core time stamp
 #define RTE_TX_DESC_DEFAULT 1024
 
 
-
-/*********************************************************************
- *********************************************************************
- *           REGULAR SPINLOCK TEST                                   *
- *********************************************************************
- *********************************************************************/
-
-extern rte_spinlock_t g_spinlock_measure_lock;
-#define SpinLockFunction()  rte_spinlock_lock( &g_spinlock_measure_lock); rte_spinlock_unlock( &g_spinlock_measure_lock);
-
 //  forward reference for compiler
 int        test_setup( __attribute__((unused))void * arg);
 int         test_loop( __attribute__((unused))void * arg);
@@ -133,9 +120,9 @@ int test_setup( __attribute__((unused)) void * arg)
    print_test_setup(); 
 
 
-    g_glob.enabled_eth_port_mask = 0x03 ;            // cmd line -p argument - here I hardwired :-0    
+    g_glob.enabled_eth_port_mask = 0x01 ;            // cmd line -p argument - here I hardwired :-0    
     g_glob.nb_eth_ports_available = 0;               // calculated based on  g_glob.enabled_port_mask
-    g_glob.event_dev_id = 0;                           // event dev_id index/handle => SSO  0
+    g_glob.event_dev_id = 0;                         // event dev_id index/handle => SSO  0
 
     memset(&(g_glob.def_p_conf), 0, sizeof(struct rte_event_port_conf));  
          g_glob.def_p_conf.dequeue_depth =1;        
@@ -152,14 +139,10 @@ int test_setup( __attribute__((unused)) void * arg)
     g_glob.rx_adptr.nb_rx_adptr_add = 1 ;  // total number of rx_adapter_adds
 
 
-
     // adapters tx 
     g_glob.tx_adptr.nb_tx_adptr = 1 ;      // total number of tx_adapters in my design.  
     g_glob.tx_adptr.nb_tx_adptr_add = 1 ;  // total number of rx_adapter_adds
 
-
-
-    // event dev queue to event dev port map
     
     // allocate storage arrays based on evp and evq , rx_adapters, and tx_adaptersabove.
      
@@ -188,6 +171,7 @@ int test_setup( __attribute__((unused)) void * arg)
                 rte_panic("Failed to allocate memery for Rx adapter\n");
     }
 
+/*  RX_ADAPTERS_ADD - memory allocate */
     g_glob.rx_adptr.rx_adptr_add = (event_rx_adapter_add_t *)malloc(sizeof(event_rx_adapter_add_t) *
                                         g_glob.rx_adptr.nb_rx_adptr_add);
     if (!g_glob.rx_adptr.rx_adptr_add) {
@@ -208,6 +192,7 @@ int test_setup( __attribute__((unused)) void * arg)
                 rte_panic("Failed to allocate memery for Rx adapter\n");
     }
 
+/*  TX_ADAPTERS_ADD - memory allocate */
     g_glob.tx_adptr.tx_adptr_add = (event_tx_adapter_add_t *)malloc(sizeof(event_tx_adapter_add_t) *
                                         g_glob.tx_adptr.nb_tx_adptr_add);
     if (!g_glob.tx_adptr.tx_adptr_add) {
@@ -221,9 +206,8 @@ int test_setup( __attribute__((unused)) void * arg)
 
 
 ////////////////////////////////////////
-// now map the queues, ports and adapters.
+// now map the evnet_queues, event_ports rx_adapters and tx_adapters
 //    - set prioritites for the queues.
-
 
 {
     event_queue_cfg_t *ptr = g_glob.evq.event_q_cfg;
@@ -235,7 +219,6 @@ int test_setup( __attribute__((unused)) void * arg)
     ( ptr + 0 )->ev_q_conf.schedule_type = 0;  /*  dont care when   
                                             event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
     ( ptr + 0 )->ev_q_conf.priority = 0x80;
-
 
 #if 0
  // queue 1
@@ -264,10 +247,10 @@ int test_setup( __attribute__((unused)) void * arg)
 //       queues and the queue priority        
 
 
- // event port 0  - two event queues (0 and 1), queue Priority 0x80 and 0x40
+ // event port 0  - one event queues ("0"), queue Priority 0x80 
    (g_glob.evp.event_p_id + 0)->nb_links = 1;
    (g_glob.evp.event_p_id + 0)->q_id[0] = 0;   // event_queue_id
-   (g_glob.evp.event_p_id + 0)->pri[0]  = 80;
+   (g_glob.evp.event_p_id + 0)->pri[0]  = 80;  // event_queue priority
 
 #if 0
 
@@ -339,18 +322,18 @@ int test_setup( __attribute__((unused)) void * arg)
 
     g_glob.tx_adptr.tx_adptr[0]  = 0 ; //  .
 
-// tx_adapter 0  connects eth dev 0/port 0 to event queue 0
+// tx_adapter 0  connects eth port_id(dev) 0/queue 0 to event queue 0
     g_glob.tx_adptr.tx_adptr_add[0].adapter_id = 0 ;     // 
     g_glob.tx_adptr.tx_adptr_add[0].eth_dev_port = 0 ;   // 
     g_glob.tx_adptr.tx_adptr_add[0].eth_dev_queue = 0 ;  // 
 
 #if 0
- // rx_adapter 0  connects eth port_id(dev)1 / queue 0 to event queue 0
+ // tx_adapter 0  connects eth port_id(dev)1 / queue 0 to event queue 0
      g_glob.tx_adptr.tx_adptr_add[1].adapter_id = 0 ;     //
      g_glob.tx_adptr.tx_adptr_add[1].eth_dev_port = 1 ;   //
      g_glob.tx_adptr.tx_adptr_add[1].eth_dev_queue = 0 ;  //
 
- // rx_adapter 0  connects eth port_id(dev)2 / queue 0 to event queue 0
+ // tx_adapter 0  connects eth port_id(dev)2 / queue 0 to event queue 0
      g_glob.tx_adptr.tx_adptr_add[2].adapter_id = 0 ;     //
      g_glob.tx_adptr.tx_adptr_add[2].eth_dev_port = 2 ;   //
      g_glob.tx_adptr.tx_adptr_add[2].eth_dev_queue = 0 ;  //
@@ -371,7 +354,6 @@ int test_setup( __attribute__((unused)) void * arg)
          RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
          rte_eth_dev_info_get (i,&eth_dev_info);
          print_rte_eth_dev_info( 0, "eth_dev_info",i, &eth_dev_info);
-
       }
    }
 #endif
@@ -385,7 +367,6 @@ int test_setup( __attribute__((unused)) void * arg)
 //    create tx queue
 //    create tx queue
 //    enable promiscuous mode
-
 
     initialize_eth_dev_ports();
 
@@ -422,7 +403,6 @@ int test_setup( __attribute__((unused)) void * arg)
 //
 //  per dpdk docs (40.1.5. Starting the Adapter Instance)
 //      event dev should be started before starting adapterss
-
  
     print_global_data(&g_glob);
 
@@ -505,14 +485,14 @@ static inline void Do_Event_Type_CPU( struct rte_event * p_event, unsigned lcore
      printf(" Message:   %s\n",(char *)p_event->event_ptr);
 
      printf("  c%d) Send message to next Port (aka core for me)  next_queue: %d \n",lcore_id
-                                             ,g_core_2_next_evt_queue_id[lcore_id]);
+                                             ,g_test_core_2_next_evt_queue_id[lcore_id]);
 
      // set to forward to next core.
      p_event->queue_id       = g_test_core_2_next_evt_queue_id[lcore_id];
      // set operation to forward packet
      p_event->op             = RTE_EVENT_OP_FORWARD;  // this for some reason stops the event form forwarding
      p_event->flow_id        += 1;
-     p_event->priority        = 0x40 ;
+     p_event->priority        = 0x80 ;
      p_event->event_ptr       = (void *)core_message[g_test_core_2_next_message[lcore_id]] ;
 
      // print_rte_event( 0, "event[i]",&events[i]);
@@ -529,8 +509,13 @@ static inline void Do_Event_Type_CPU( struct rte_event * p_event, unsigned lcore
      }
 }
 
-#define LOCK_LOOPS (10*10)
 #define BATCH_SIZE  4
+extern int g_drop_all_traffic ;extern int g_drop_all_traffic ;
+
+
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+//     _loop Function
 
 int test_loop( __attribute__((unused)) void * arg)
 {
@@ -542,7 +527,7 @@ int test_loop( __attribute__((unused)) void * arg)
    
     struct rte_event events[BATCH_SIZE];
     uint16_t nb_rx; 
-    uint16_t ret;
+//    uint16_t ret;
     int core_counter = 0;
 
     if( ! ( rte_lcore_is_enabled(23)  ))
@@ -763,7 +748,7 @@ int test_loop( __attribute__((unused)) void * arg)
                                             VERBOSE_M(ETH_L3_IPV4_MESSAGES)  printf(" IPV4 Protocol:  TCP 0x%04x \n",ipV4.Protocol );
                                             break;
                                         case 0x11:                       // UDP
-                                            VERBOSE_M(ETH_L3_IPV4_MESSAGES)printf(" IPV4 Protocol:  UDP 0x%04x  event_port_id %d \n",ipV4.Protocol,event_port_poll_index );
+                                            VERBOSE_M(ETH_L3_IPV4_MESSAGES)printf(" IPV4 Protocol:  UDP 0x%04x  event_port_id %d \n",ipV4.Protocol,events[i].queue_id );
                                             {
                                                 UDP_Hdr *p_udp_hdr;
                                                 p_udp_hdr = ( UDP_Hdr *) l4_ptr;

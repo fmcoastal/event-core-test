@@ -88,6 +88,8 @@ MacAddr_t g_Mac_eth0 ={.addr[0]=0x00,
 void print_eth_setup(void);
 void print_eth_setup(void)
 {
+printf("\n");
+printf("%s\n",__FILE__);
 printf("\n"
 "  ---------------          ------------                                     \n"
 "  |eth port_id 0| -------  |evt_que 0 | --                                  \n"
@@ -195,16 +197,6 @@ extern uint64_t  g_per_core_result[]; // per core time stamp
 #define RTE_TX_DESC_DEFAULT 1024
 
 
-
-/*********************************************************************
- *********************************************************************
- *           REGULAR SPINLOCK TEST                                   *
- *********************************************************************
- *********************************************************************/
-
-extern rte_spinlock_t g_spinlock_measure_lock;
-#define SpinLockFunction()  rte_spinlock_lock( &g_spinlock_measure_lock); rte_spinlock_unlock( &g_spinlock_measure_lock);
-
 //  forward reference for compiler
 int        ethdev_setup( __attribute__((unused))void * arg);
 int         ethdev_loop( __attribute__((unused))void * arg);
@@ -297,6 +289,9 @@ void   initialize_eth_dev_ports(void)
     uint16_t nb_txd = RTE_TX_DESC_DEFAULT;
     uint32_t nb_mbufs;
     uint16_t nb_ports;
+    char     string[64];
+    int16_t  eth_port_id;
+    uint32_t i;
 
     struct rte_eth_conf port_conf = {
            .rxmode = {
@@ -318,8 +313,31 @@ void   initialize_eth_dev_ports(void)
     print_rte_eth_conf(0,"default: port_conf",0,&port_conf);    
 
 //   allocate mbuffs for the eth-dev interface HW.
-    nb_ports = 2;  // FS -EVOL  I set this to 2 because I am going to use 2 etherent connections.  
+//     first, how many ports, and confirm against eal_init
+    nb_ports = 0 ;
+    for ( i = 0 ; i < (8*sizeof(uint16_t)) ; i++ )   // size of g_glob.enabled_port_mask
+    {
+       if ( (g_glob.enabled_eth_port_mask  & (0x01 << i))  != 0) { nb_ports++; printf(".");}
+    }       
+    printf("\n g_glob.enabled_eth_port_mask (0x%04x)  thinks we have %d ethernets port in use \n",   
+                                                       g_glob.enabled_eth_port_mask,
+                                                       nb_ports );
 
+    printf("rte_eal_init() thinks I have the following ethdev device\n");
+    // print eth port ids  that rte_init sees
+    {
+        RTE_ETH_FOREACH_DEV(eth_port_id)
+        {
+            /* get (-ENODEV) or (-EINVAL) if port_id is invalid. */
+            if ( rte_eth_dev_get_name_by_port( eth_port_id , string) == 0)
+            {
+                printf("  ----> portid 0x%x enabled PCIe:  %s \n",eth_port_id,string );
+            }
+        }
+     }
+
+
+    // allocate memory
     nb_mbufs = RTE_MAX(nb_ports * (RTE_ETHDEV_RX_DESC_DEFAULT +
                                    RTE_ETHDEV_TX_DESC_DEFAULT +
                                    MAX_PKT_BURST + rte_lcore_count() *
@@ -726,7 +744,7 @@ WAI();
                                                             g_glob.tx_adptr.tx_adptr_add[j].eth_dev_queue 
                                                             );
                  if (ret)
-                     rte_panic("Failed to add queues to Rx adapter\n");
+                     rte_panic("Failed to add queues to Tx adapter\n");
             }
          }
 
@@ -751,7 +769,7 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 
     g_glob.enabled_eth_port_mask = 0x03 ;            // cmd line -p argument - here I hardwired :-0    
     g_glob.nb_eth_ports_available = 0;               // calculated based on  g_glob.enabled_port_mask
-    g_glob.event_dev_id = 0;                           // event dev_id index/handle => SSO  0
+    g_glob.event_dev_id = 0;                         // event dev_id index/handle => SSO  0
 
     memset(&(g_glob.def_p_conf), 0, sizeof(struct rte_event_port_conf));  
          g_glob.def_p_conf.dequeue_depth =1;        
@@ -1140,7 +1158,6 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 
 
 
-#define LOCK_LOOPS (10*10)
 #define BATCH_SIZE  4
 
 char  ethdev_m0[] = { "Another"        };
@@ -1154,6 +1171,9 @@ int g_drop_all_traffic = 0;
 
 struct rte_event         g_ev        __rte_cache_aligned;          // use this to encode an event.
 
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+//     _loop Function
 
 int ethdev_loop( __attribute__((unused)) void * arg)
 {

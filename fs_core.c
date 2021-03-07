@@ -138,15 +138,7 @@ extern fs_time_stamp g_per_core_time_stamp[32]__rte_cache_aligned; // per core t
 extern uint64_t  g_per_core_result[]; // per core time stamp
 
 
-/*********************************************************************
- *********************************************************************
- *           REGULAR SPINLOCK TEST                                   *
- *********************************************************************
- *********************************************************************/
-
-extern rte_spinlock_t g_spinlock_measure_lock;
-#define SpinLockFunction()  rte_spinlock_lock( &g_spinlock_measure_lock); rte_spinlock_unlock( &g_spinlock_measure_lock);
-
+/********************************************************************/
 //  forward reference for compiler
 int        core_setup( __attribute__((unused))void * arg);
 int         core_loop( __attribute__((unused))void * arg);
@@ -538,17 +530,8 @@ uint32_t event_queue_cfg = 0;
 
 
 
-
-
-
-
-
-
-
-
 struct rte_event   g_ev;
 
-#define LOCK_LOOPS (10*10)
 #define BATCH_SIZE  4
 
 char  m0[] = { "Eat"        };
@@ -558,6 +541,10 @@ char  m3[] = { "Bar & Grill"};
 char * core_message[] = {m0,m1,m2,m3};
 
 
+
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+//     _loop Function
 int core_loop( __attribute__((unused)) void * arg)
 {
     unsigned lcore_id;

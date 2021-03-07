@@ -141,19 +141,7 @@ extern uint64_t  g_per_core_result[]; // per core time stamp
 #define RTE_TX_DESC_DEFAULT 1024
 
 
-
-/*********************************************************************
- *********************************************************************
- *           REGULAR SPINLOCK TEST                                   *
- *********************************************************************
- *********************************************************************/
-
-extern rte_spinlock_t g_spinlock_measure_lock;
-#define SpinLockFunction()  rte_spinlock_lock( &g_spinlock_measure_lock); rte_spinlock_unlock( &g_spinlock_measure_lock);
-
 //  forward reference for compiler
-
-
 int        timer_setup( __attribute__((unused))void * arg);
 int         timer_loop( __attribute__((unused))void * arg);
 int        timer_print( __attribute__((unused))void * arg);
@@ -246,9 +234,9 @@ int timer_setup( __attribute__((unused)) void * arg)
     WAI();
     timer_print_setup();
 
-    g_glob.enabled_eth_port_mask = 0x03 ;                // cmd line -p argument - here I hardwired :-0    
-    g_glob.nb_eth_ports_available = 0;                   // calculated based on  g_glob.enabled_port_mask
-    g_glob.event_dev_id = 0;                           // event dev_id index/handle => SSO  0
+    g_glob.enabled_eth_port_mask = 0x03 ;            // cmd line -p argument - here I hardwired :-0    
+    g_glob.nb_eth_ports_available = 0;               // calculated based on  g_glob.enabled_port_mask
+    g_glob.event_dev_id = 0;                         // event dev_id index/handle => SSO  0
 
     memset(&(g_glob.def_p_conf), 0, sizeof(struct rte_event_port_conf));  
          g_glob.def_p_conf.dequeue_depth =1;        
@@ -538,6 +526,10 @@ extern int g_drop_all_traffic ;
 
 extern struct rte_event       g_ev;          // use this to encode an event.
 struct rte_event_timer g_ev_timer;    // use this to encode a timer event.
+
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+//     _loop Function
 
 int timer_loop( __attribute__((unused)) void * arg)
 {

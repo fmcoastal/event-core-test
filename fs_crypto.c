@@ -122,8 +122,6 @@ o-------------> | |    flow 1   | |      |
   Sign algo:    sha256,rsa2048:dev
   Sign value:   0f490c9a3f16a146b52a131662c15e2147a276f8fbbed20c2dfb24e04dbecc306a38ebbe1061fa5777b8b30ad795b5a0c6dc564607e247dcc22dad85d7266c8cb1ce3bff0e0cb9c2005b28c7f680c2406ab07a1125de5a6e7737df281fc6cee2aee6379f164bfc5997a9a89873718c2f08a96f7e32254fee53162c922192a34cfc3708d81f3ee2e58b7bdec8da08a27e294f4f9b807301b647aeb095f20edec64ab61a5aeb72d967af72b4c5c3ece4288e5b2df9b0a9992366cc18747ecdd10e6a6dd2a967f23435c2942c413b012dbe1b920aabc2a97bbabad485eeac50f4ca88ea424854a3f9dc196ad617a82a21e4f15e9643132ce4734e7c5fa59c2a78ae
 
-
-
 #endif
 char  c_m0[] = { "Killroy"        };
 char  c_m1[] = { "was"         };
@@ -131,15 +129,6 @@ char  c_m2[] = { "there"       };
 char  c_m3[] = { ":-)"};
 char * cpt_message[] = {c_m0,c_m1,c_m2,c_m3};
 
-                                                                                    
-/*********************************************************************              
- *********************************************************************              
- *           REGULAR SPINLOCK TEST                                   *              
- *********************************************************************              
- *********************************************************************/
-
-// extern rte_spinlock_t g_spinlock_measure_lock;
-#define SpinLockFunction()  rte_spinlock_lock( &g_spinlock_measure_lock); rte_spinlock_unlock( &g_spinlock_measure_lock);
 
 //  forward reference for compiler
 int        crypto_setup( __attribute__((unused))void * arg);
@@ -609,9 +598,10 @@ uint32_t event_queue_cfg = 0;
 
 
 
-#define LOCK_LOOPS (10*10)
 #define BATCH_SIZE  4
-
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+//     _loop Function
 
 int crypto_loop( __attribute__((unused)) void * arg)
 {

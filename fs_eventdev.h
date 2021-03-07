@@ -115,8 +115,8 @@ typedef struct event_port_link_struct
 
 struct event_ports {
         q_id_and_priority_t  *event_p_id;
-        uint8_t            nb_ports;
-        rte_spinlock_t    lock;
+        uint8_t              nb_ports;
+        rte_spinlock_t       lock;
 };
 
 
