@@ -11,11 +11,26 @@
 
 
 
-ln fs_test_multi_evt_port.c  fs_test.c
-ln fs_test_multi_evt_port.h  fs_test.h
+if [ "$1" == "" ] ;  then
 
+rm fs_test.c
+rm fs_test.h
 
-#ln fs_test_parse.c  fs_test.c
-#ln fs_test_parse.h  fs_test.h
+ln -s fs_test_multi_evt_port.c  fs_test.c
+ln -s fs_test_multi_evt_port.h  fs_test.h
 
+else
+
+rm fs_test.c
+rm fs_test.h
+
+ln fs_test_parse.c  fs_test.c
+ln fs_test_parse.h  fs_test.h
+
+fi
+md5sum fs_test.c
+md5sum fs_test_multi_evt_port.c
+md5sum fs_test_parse.c
+
+make clean
 
