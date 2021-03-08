@@ -494,8 +494,8 @@ void printIPv4_Hdr_t(IPv4_Hdr_t *hdr)
     printf("  0x%02x        Congestion\n"  , hdr->Congestion);
     printf("  0x%04x      TotalLength (IPV4+Payload)\n"    , SWAP_16(hdr->TotalLength));
     printf("  0x%04x      Identification\n"                , SWAP_16(hdr->Identification));
-    printf("  0x%02x        Flags\n"                       , hdr->Flags);
-    printf("  0x%04x      FragOffset\n"                    , SWAP_16(hdr->FragOffset));
+//    printf("  0x%02x        Flags\n"                       , hdr->Flags);
+//    printf("  0x%04x      FragOffset\n"                    , SWAP_16(hdr->FragOffset));
     printf("  0x%02x        TimeToLive\n"                  , hdr->TimeToLive);
     printf("  0x%02x        protocol (0x06 TCP 0x11 UDP 0x01 ICMP)\n" , hdr->Protocol);
     printf("  0x%04x      Checksum\n"                      , SWAP_16(hdr->CheckSum));
@@ -558,7 +558,7 @@ int GetIPv4HeaderSize(uint8_t * pIPv4Start)
 
 
 
-void printUDP_Hdr(UDP_Hdr *hdr)
+void printUDP_Hdr(UDP_Hdr_t *hdr)
 {
     printf("\n");
     printf("UDP Header:\n");
@@ -571,7 +571,7 @@ void printUDP_Hdr(UDP_Hdr *hdr)
 }
 
 // copies the MAC header data to the structure pointed to by MAC_Hdr_t
-int GetUDPData(uint8_t * pUDPStart, UDP_Hdr *ExtractedData)
+int GetUDPData(uint8_t * pUDPStart, UDP_Hdr_t *ExtractedData)
 {
     uint16_t * ptr = (unsigned short *)pUDPStart;
 
@@ -587,8 +587,27 @@ int GetUDPData(uint8_t * pUDPStart, UDP_Hdr *ExtractedData)
 int GetUDPHeaderSize(uint8_t * pUDPStart)
 {
      VERBOSE(1) printf("%s : %p \n",__FUNCTION__,pUDPStart);
-     return sizeof(UDP_Hdr);
+     return sizeof(UDP_Hdr_t);
 }
+
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////// l3 - ipv4 - ICMP ////////////////////////////
+
+
+void printICMPPktData_t(ICMPPktData_t *p)
+{
+    printf("\n");
+    printf("ICMP  Header:  {\n");
+
+
+    printf("%s    uint8_t    Type           0x%02x        offset: 0x%02lx \n" ,"", p->Type              ,offsetof(ICMPPktData_t,Type) );
+    printf("%s    uint8_t    Code;          0x%02x        offset: 0x%02lx \n" ,"", p->Code              ,offsetof(ICMPPktData_t,Code) );
+    printf("%s    uint16_t   Checksum;      0x%04x      offset: 0x%02lx \n"   ,"",ntohs(p->Checksum)    ,offsetof(ICMPPktData_t,Checksum) );
+    printf("%s    uint32_t   RestOfHeader;  0x%08x  offset: 0x%02lx \n"       ,"",ntohs(p->RestOfHeader),offsetof(ICMPPktData_t,RestOfHeader));
+    printf("    }\n");
+} 
+
+
 
 
 ////////////////////////////////////////////////////
@@ -841,19 +860,19 @@ uint64_t build_MAC_packet(MAC_Hdr_t *MACHdr ,uint8_t * pData, uint16_t DataSz,ui
 //  i DataSz : size of UDP payload Data
 //  i/o pBuf : input buffer, and resulting UDP Header+Data,
 //  i BufSz : input udp buffer size resulting size is returned int the packet data for UDP
-uint64_t build_udp_packet(UDP_Hdr *UdpHdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz )
+uint64_t build_udp_packet(UDP_Hdr_t *UdpHdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz )
 {
     uint64_t i;
     int64_t j;
     uint8_t  *ptr  = (uint8_t *)UdpHdr;
-    UDP_Hdr  *uptr = (UDP_Hdr *)pBuf;
+    UDP_Hdr_t  *uptr = (UDP_Hdr_t *)pBuf;
 
-    if(BufSz < (DataSz + sizeof(UDP_Hdr)))
+    if(BufSz < (DataSz + sizeof(UDP_Hdr_t)))
     {
         return -1;
     }
     // copy the header
-    for(i = 0 ; i < sizeof(UDP_Hdr) ; i++)  // this work because the header and the struct are the same
+    for(i = 0 ; i < sizeof(UDP_Hdr_t) ; i++)  // this work because the header and the struct are the same
     {
         *pBuf++ = *ptr++;
     }
@@ -891,7 +910,7 @@ static uint8_t  g_MACBuff[G_BUFF_SIZE];
 //  i/o PktSz -> size of starting buffer, and resulting size of udp header+ upd Data
 int  FBuildUdpPacket( ip_endpt_t *dst,ip_endpt_t *src ,uint8_t * data, int64_t datasz ,uint8_t **PktPtr,int64_t * PktSz )
 {
-    UDP_Hdr  UDPHdr  ;
+    UDP_Hdr_t  UDPHdr  ;
     IPv4_Hdr_t IPv4Hdr ;
     MAC_Hdr_t  MACHdr  ;
 
@@ -934,7 +953,7 @@ int  FBuildUdpPacket( ip_endpt_t *dst,ip_endpt_t *src ,uint8_t * data, int64_t d
         IPv4Hdr.HeaderLength   = 0x05;
         IPv4Hdr.DiffSrv        = 0x00;
         IPv4Hdr.Congestion     = 0x00;
-        IPv4Hdr.TotalLength    = 20+sizeof(UDP_Hdr)+datasz;
+        IPv4Hdr.TotalLength    = 20+sizeof(UDP_Hdr_t)+datasz;
         IPv4Hdr.Identification = 0 ;
         IPv4Hdr.Flags          = 0x2;
         IPv4Hdr.FragOffset     = 0;
@@ -1013,11 +1032,11 @@ int ParsePacketData( uint8_t *buf, int64_t bufsz,
     unsigned char * pPayload;
     int64_t         PayloadSz;
 
-    MAC_Hdr_t         lMAChdr;
+    MAC_Hdr_t       lMAChdr;
     unsigned char * pIPv4;
-    IPv4_Hdr_t         lIPv4hdr;
+    IPv4_Hdr_t      lIPv4hdr;
     unsigned char * pUDP;
-    UDP_Hdr         lUDPhdr;
+    UDP_Hdr_t       lUDPhdr;
 
     WAI();
     if(L3Type    != NULL) *L3Type    = 0;

@@ -113,7 +113,7 @@ typedef struct
     uint32_t  fSrcIPAddr;       // need these for crc calculation
     uint32_t  fDstIPAddr;       // need these for crc calculation
 
-}TCP_Hdr;
+}TCP_Hdr_t;
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -139,6 +139,10 @@ typedef struct
 }MAC_Hdr_t;
 
 
+
+//////////////////////////
+// MAC_Addr_t functions
+
 // returns a string of a human readable formatted Mac String.
 extern  char * formatMACAddr(MacAddr_t* mac);
 
@@ -153,6 +157,24 @@ extern  void SetMAC(MacAddr_t* Dst, MacAddr_t* Src);
 // returns 0 if the mac addresses are Identical
 extern  int  CompareMAC(MacAddr_t* mac0, MacAddr_t* mac1);
 
+
+///////////////////
+//  MAC_Hdr_t functions
+
+//  swaps the src and destination mac address in a MAC_Hdr_t
+inline void SwapMAC(MAC_Hdr_t  *p) 
+{
+   uint8_t tmp;
+   int i;
+                              
+    for( i = 0 ; i < (int)(sizeof(MacAddr_t)) ; i++)
+    {
+         tmp = p->DstMac.addr[i] ;
+         p->DstMac.addr[i] = p->SrcMac.addr[i];
+         p->SrcMac.addr[i] = tmp;
+    }
+}
+
 extern  void printMAC_Hdr_t(MAC_Hdr_t *hdr);
 
 // copies the MAC header data to the structure pointed to by MAC_Hdr_t
@@ -163,6 +185,10 @@ extern   int GetMacData(uint8_t * pMACStart, MAC_Hdr_t *ExtractedData);
 //   does not count the 4bytes of crc at the end.
 extern  int GetMacHeaderSize(uint8_t * pMACStart);
 
+
+
+//////////////////////
+//  IP addrss functions
 // assume the string is at least
 char *   formatIpAddr(uint32_t ip);
 uint32_t StringToIp(char * string);  // string must be a.b.c.d
@@ -179,18 +205,20 @@ void macString(char mac[],char * string);
 //IP Header
 typedef struct
 {
-    uint8_t   Version;         /* Version 4  Length 4 */
-    uint8_t   HeaderLength;    /*            Length 4 */
-
-    uint8_t   DiffSrv;         /* DiffServ6  Congestion notification 2 */
-    uint8_t   Congestion;      /* DiffServ6  Congestion notification 2 */
-
+    struct { 
+       uint8_t   Version      : 4;   /* Version 4  Length 4 */
+       uint8_t   HeaderLength : 4;   /*            Length 4 */
+    };
+    struct {
+       uint8_t   DiffSrv     : 6;    /* DiffServ6  Congestion notification 2 */
+       uint8_t   Congestion  : 2;    /* DiffServ6  Congestion notification 2 */
+    } ;
     uint16_t  TotalLength;     /* lengh of the header and the IP Payload */
     uint16_t  Identification;
-
-    uint8_t   Flags;            /* Flg3 Frag Offset13*/
-    uint16_t  FragOffset;       /* Flg3 Frag Offset13*/
-
+    struct {
+       uint16_t   Flags      : 3;   /* Flg3 Frag Offset13*/
+       uint16_t  FragOffset  : 13;  /* Flg3 Frag Offset13*/
+    } ;
     uint8_t   TimeToLive;
     uint8_t   Protocol;
     uint16_t  CheckSum;       /* header only */
@@ -207,6 +235,18 @@ typedef struct
 extern  char * formatIPAddr(uint32_t IpAddr);
 
 extern  void printIPv4_Hdr_t(IPv4_Hdr_t *hdr);
+
+inline void SwapIPv4_Hdr_IPaddr(IPv4_Hdr_t  *p) 
+{                               
+   uint32_t tmp = p->SrcIPAddr;         
+   p->SrcIPAddr = p->DstIPAddr ;
+   p->DstIPAddr = tmp;
+}
+
+
+
+   
+
 
 // copies the MAC header data to the structure pointed to by MAC_Hdr_t
 extern  int GetIPv4Data(uint8_t * pIPv4Start, IPv4_Hdr_t *ExtractedData);
@@ -260,19 +300,15 @@ extern  void printArpPktData_t(ArpPktData_t *hdr);
 //////////////////////////// l3 - ipv4 - ICMP ////////////////////////////
 
 typedef struct __attribute__((__packed__)) {
-    uint16_t HwType;
-    uint16_t Protocol;
+    uint8_t  Type;
+    uint8_t  Code;
+    uint16_t Checksum;
     uint16_t  HwAddLen;
-    uint16_t  ProtocolAddLen;
-    uint16_t OpCode;
-    MacAddr_t  SrcHwAddr;
-    uint32_t  SrcProtocolAddr;
-    MacAddr_t  TarHwAddr;
-    uint32_t  TarProtocolAddr;
+    uint32_t  RestOfHeader;
 }ICMPPktData_t;
 
 
-//extern  void printICMP_PktData_t(ArpPktData_t *hdr);
+extern  void printICMPPktData_t(ICMPPktData_t *p);
 
 
 
@@ -292,13 +328,21 @@ typedef struct
     uint16_t  DstPort;
     uint16_t  Length;
     uint16_t  CheckSum;
-}UDP_Hdr;
+}UDP_Hdr_t;
 
 
-extern void printUDP_Hdr(UDP_Hdr *hdr);
+
+inline void SwapUDP_Hdr_Ports(UDP_Hdr_t *p) 
+{                               
+   uint16_t tmp = p->SrcPort;         
+   p->SrcPort = p->DstPort ;
+   p->DstPort = tmp;
+}
+
+extern void printUDP_Hdr(UDP_Hdr_t *hdr);
 
 // copies the MAC header data to the structure pointed to by MAC_Hdr_t
-extern  int GetUDPData(uint8_t * pUDPStart, UDP_Hdr *ExtractedData);
+extern  int GetUDPData(uint8_t * pUDPStart, UDP_Hdr_t *ExtractedData);
 
 // Returns the number of bytes to the "Next Packet Type"
 extern  int GetUDPHeaderSize(uint8_t * pUDPStart);
@@ -316,11 +360,11 @@ extern  int GetUDPHeaderSize(uint8_t * pUDPStart);
 
 // Builds a TCP packet,
 //   Calculates Length and Checksum
-uint64_t build_tcp_packet(TCP_Hdr *TcpHdr , uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz );
+uint64_t build_tcp_packet(TCP_Hdr_t *TcpHdr , uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz );
 
 // Builds a UDP packet,
 //   Calculates Length and Checksum
-uint64_t build_udp_packet(UDP_Hdr *UdpHdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz );
+uint64_t build_udp_packet(UDP_Hdr_t *UdpHdr ,uint8_t * pData, uint16_t DataSz,uint8_t *pBuf, uint16_t BufSz );
 
 
 

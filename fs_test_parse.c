@@ -69,8 +69,10 @@
 
 //#include "fs_print_rte_structures.h"
 
-extern uint64_t  g_core_messages;
-extern int64_t g_print_interval;
+extern uint64_t g_core_messages;
+extern int64_t  g_print_interval;
+int64_t         g_loopback_traffic =  1;   // if =1 will swap src <->det for l2,l3,and l4 headers
+
 
 void print_test_setup(void);
 void print_test_setup(void)
@@ -468,6 +470,9 @@ int test_setup( __attribute__((unused)) void * arg)
 }
 
 
+
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //////  Handle CPU Messages
@@ -695,7 +700,7 @@ int test_loop( __attribute__((unused)) void * arg)
                          }
                          // L2 payload - EthType
                          switch (htons(l2_hdr.EtherType)) {
-                             case 0x0806:    /* ARP   */
+                             case 0x0001:    /* ARP   */
                                  {
 
                                      ArpPktData_t * p_arp = (ArpPktData_t *)l3_ptr  ;
@@ -735,24 +740,65 @@ int test_loop( __attribute__((unused)) void * arg)
                              case 0x0800:    /* IPV4  */
                                 {
                                    IPv4_Hdr_t ipV4;
+                                   ICMPPktData_t * p_ICMP;
                                    GetIPv4Data( l3_ptr, &ipV4 ) ;
 
                                    VERBOSE_M( ETH_L3_DETAILS )    printIPv4_Hdr_t(  &ipV4);
 
-                                   l4_ptr = l3_ptr += (ipV4.HeaderLength * 4)  ;   // point to the L3 Data type
+                                   l4_ptr = l3_ptr + (ipV4.HeaderLength * 4)  ;   // point to the L3 Data type
                                    switch ( ipV4.Protocol ) {
-                                        case 0x01:                       // ICMP - ECHO??
+                                        case 0x01:                       // ICMP - assume for now ECHO  - EVOL EVOL EVOL  assume it is an echo for now ??
                                             VERBOSE_M(ETH_L3_IPV4_MESSAGES)  printf(" IPV4 Protocol:  ICMP  0x%04x\n",ipV4.Protocol );
-                                            break;
+                                            p_ICMP = ((ICMPPktData_t *) l4_ptr);
+                                            printICMPPktData_t( p_ICMP  );
+                                            switch (p_ICMP->Type) {
+                                            case 0x00:
+                                                printf("ICMP echo Reply\n");
+                                                // BUG HERE- need to figure out how to fix the CRC.  
+                                                //           then change
+                                                //           ((ICMPPktData_t *)(l4_ptr))->Type =0; 
+                                                // swap the MAC addrss
+                                                SwapMAC((MAC_Hdr_t *) l2_ptr );                                                 
+                                                // swap the IP addrss
+                                                SwapIPv4_Hdr_IPaddr( ( IPv4_Hdr_t *) l3_ptr);  
+                                               break;
+                                            case 0x03:
+                                               printf("ICMP Destination Unreachable 0x03\n");  
+                                               break;
+                                            case 0x08:
+                                               printf("ICMP echo request\n");  
+                                                // BUG HERE- need to figure out how to fix the CRC. in case 00 above.  
+                                                //           Then requst will only need to forward packes.  
+                                                //           Then, delete the swaps,and just forward the packet.  
+                                                // swap the MAC addrss
+                                                SwapMAC((MAC_Hdr_t *) l2_ptr );                                                 
+                                                // swap the IP addrss
+                                                SwapIPv4_Hdr_IPaddr( ( IPv4_Hdr_t *) l3_ptr);  
+ 
+                                               break;
+                                            default:
+                                               printf("ICMP unrecognized \"Type\": %d\n", p_ICMP->Type );
+                                               break;
+                                            }
+                                           break;
                                         case 0x06:                       // TCP
                                             VERBOSE_M(ETH_L3_IPV4_MESSAGES)  printf(" IPV4 Protocol:  TCP 0x%04x \n",ipV4.Protocol );
                                             break;
                                         case 0x11:                       // UDP
                                             VERBOSE_M(ETH_L3_IPV4_MESSAGES)printf(" IPV4 Protocol:  UDP 0x%04x  event_port_id %d \n",ipV4.Protocol,events[i].queue_id );
                                             {
-                                                UDP_Hdr *p_udp_hdr;
-                                                p_udp_hdr = ( UDP_Hdr *) l4_ptr;
+                                                UDP_Hdr_t *p_udp_hdr;
+                                                p_udp_hdr = ( UDP_Hdr_t *) l4_ptr;
                                                 VERBOSE_M(ETH_L4_UDP_DETAILS ) printUDP_Hdr(p_udp_hdr);
+                                                if( g_loopback_traffic == 1)
+                                                {
+                                                    // swap the MAC addrss
+                                                    SwapMAC((MAC_Hdr_t *) l2_ptr );                                                 
+                                                    // swap the IP addrss
+                                                    SwapIPv4_Hdr_IPaddr( ( IPv4_Hdr_t *) l3_ptr);  
+                                                    // swap the des Port ??
+                                                    SwapUDP_Hdr_Ports(  (UDP_Hdr_t *) l4_ptr  );          
+                                                 } // end g_loopback-traffic  
                                             }
                                             break;
                                         case 0x2f:                       // GRE
@@ -770,7 +816,7 @@ int test_loop( __attribute__((unused)) void * arg)
                                  break;
                              case 0x86dd:    /* IPV6 */
                              default:
-                                 VERBOSE_M (ETH_L3_MESSAGES ) printf("%s Received  L2.EthType: 0x%04x  -- UNKNOWN / Unhandled -- %s \n",C_RED, 0x86dd, C_NORMAL);
+                                 VERBOSE_M (ETH_L3_MESSAGES ) printf("%s Received  L2.EthType: 0x%04x  -- UNKNOWN / Unhandled -- %s \n",C_RED,htons(l2_hdr.EtherType), C_NORMAL);
                                  break;
                          } // end switch EthType
                          // Disposition the packet.
