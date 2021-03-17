@@ -6,18 +6,18 @@ APP = core_test_app
 
 # all source are stored in SRCS-y
 SRCS-y := main.c
-SRCS-y += fs_lpm_test.c
-SRCS-y += fs_spinlock_test.c
-SRCS-y += fs_core.c
-SRCS-y += fs_crypto.c
-SRCS-y += fs_ethdev.c
-SRCS-y += fs_eventdev.c
-SRCS-y += fs_print_rte_ethdev_struct.c
-SRCS-y += fprintbuff.c
-SRCS-y += fs_print_rte_mbuff.c
-SRCS-y += fs_eventdev_timer.c
 SRCS-y += fs_global_vars.c
 SRCS-y += fs_net_common.c
+SRCS-y += fprintbuff.c
+SRCS-y += fs_print_rte_ethdev_struct.c
+SRCS-y += fs_print_rte_mbuff.c
+SRCS-y += fs_lpm_test.c
+SRCS-y += fs_spinlock_test.c
+SRCS-y += fs_eventdev.c
+SRCS-y += fs_core.c
+SRCS-y += fs_eventdev_timer.c
+SRCS-y += fs_ethdev.c
+SRCS-y += fs_crypto.c
 SRCS-y += fs_test.c
 
 

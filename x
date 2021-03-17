@@ -26,7 +26,8 @@ if  [ "$RUN_CODE" == "9" ] ; then
 
 #./build/core_test_app -c 0x800000 -w 0002:0e:00.0,xae_cnt=32768 -w 0002:10:00.1 -w 0002:05:00.0 –log-level=’pmd.octeontx2.*,debug’ -- -t 9 -v 4 -p 100000
 
-COMPILED=fs_test_test_parse
+#COMPILED=fs_test_test_parse
+COMPILED=fs_test_rss
 #COMPILED=fs_test_multi_evt_port
 
     if [ "$COMPILED" == "fs_test_test_parse" ] ; then
@@ -37,6 +38,13 @@ COMPILED=fs_test_test_parse
 
        # 1 cpu polling 3 event-ports  ( ln -s  fs_test_multi_evt_port.[ch] fs_test.[ch]    )
        ./build/core_test_app -c 0x800000 -w 0002:0e:00.0,xae_cnt=32768,single_ws=1 -w 0002:10:00.1 -w 0002:04:00.0 -w 0002:05:00.0 -w 0002:06:00.0  -w 0002:07:00.0 –log-level=’eth.octeontx2.*,debug’  -- -t 9  -p 10000
+
+    elif [ "$COMPILED" == "fs_test_rss" ] ; then
+
+       # 1 cpu polling 3 event-ports  ( ln -s  fs_test_multi_evt_port.[ch] fs_test.[ch]    )
+       ./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1 -w 0002:04:00.0  –log-level=’eth.octeontx2.*,debug’  -- -t 9  -p 10000
+ 
+
     else
        echo " unrecognized test application variant -  Please Fix !!"
        exit

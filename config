@@ -11,7 +11,7 @@
 
 
 
-if [ "$1" == "" ] ;  then
+if [ "$1" == "multi" ] ; then
 
 rm fs_test.c
 rm fs_test.h
@@ -19,7 +19,7 @@ rm fs_test.h
 ln -s fs_test_multi_evt_port.c  fs_test.c
 ln -s fs_test_multi_evt_port.h  fs_test.h
 
-else
+elif [ "$1" == "parse" ] ; then
 
 rm fs_test.c
 rm fs_test.h
@@ -27,10 +27,28 @@ rm fs_test.h
 ln fs_test_parse.c  fs_test.c
 ln fs_test_parse.h  fs_test.h
 
+elif [ "$1" == "rss" ] ; then
+
+rm fs_test.c
+rm fs_test.h
+
+ln fs_test_rss.c  fs_test.c
+ln fs_test_rss.h  fs_test.h
+
+else
+  echo "unrecognize argument"
+  echo " valid arguments:"
+  echo "         \" multi\""
+  echo "         \"parse\" "
+  echo "         \"rss\""
+  exit
 fi
+
+
 md5sum fs_test.c
 md5sum fs_test_multi_evt_port.c
 md5sum fs_test_parse.c
+md5sum fs_test_rss.c
 
 make clean
 
