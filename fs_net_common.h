@@ -144,14 +144,18 @@ typedef struct
 // MAC_Addr_t functions
 
 // returns a string of a human readable formatted Mac String.
-extern  char * formatMACAddr(MacAddr_t* mac);
+//  string is location where "mac" is converted.  
+//  function returns the pointer passed in. (easier for printf usages) 
+extern  char * format_mac_addr(MacAddr_t* mac,char * string);
 
 // on success (0), update the *mac,
 // on failure (-1),  leaves *mac unchanged.
 extern  int StringToMac(char * string,MacAddr_t * mac);
 
+//  string is a label printed with the mac address. 
 extern  void printMAC(MacAddr_t* mac,const char * string);
 
+// copies src to destination
 extern  void SetMAC(MacAddr_t* Dst, MacAddr_t* Src);
 
 // returns 0 if the mac addresses are Identical

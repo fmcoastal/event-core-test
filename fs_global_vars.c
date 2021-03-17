@@ -73,7 +73,7 @@ int i,j;
       for ( i = 0 ; i < p->nb_eth_ports_available ; i++)
       {
          if ( i%4 == 0) printf("\n");
-         printf("  %d) %s",i,format_mac_addr(eth_addr,&( p->eth_addr[i])));
+         printf("  %d) %s",i,rte_format_mac_addr(eth_addr,&( p->eth_addr[i])));
       }
       printf("\n");
    }

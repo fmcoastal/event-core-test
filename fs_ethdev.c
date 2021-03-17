@@ -1384,9 +1384,9 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                  buf = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
                  GetMacData(buf,&l2_hdr);
                  
-                 if( l2_hdr.EtherType == 0x0806 ) /* ICMP */
+                 if( l2_hdr.EtherType == 0x0806 ) /* ARP  */
                  {
-                      printf("%s GOT AN ICMP Packet!! %s \n",C_RED, C_NORMAL);
+                      printf("%s GOT AN ARP Packet!! %s \n",C_RED, C_NORMAL);
                  } 
 
                  // only fall in if p_print_interval is >0 else do not print
@@ -1399,11 +1399,12 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                                                                       events[i].flow_id,
                                                                       events[i].queue_id,
                                                                       event_port_id );
-                     if(g_verbose > 3)
+
+                     VERBOSE_M( ETH_L2_DETAILS )
                      {
                          PrintBuff((uint8_t*) buf, 0x40 , NULL ,"mbuff Raw Buffer");
                      }
-                      if(g_verbose > 4)
+                     VERBOSE_M( ETH_L3_DETAILS )
                      {
                          PrintBuff((uint8_t*) p_mbuff, (0x100 + p_mbuff->pkt_len + 0x10) , NULL ,"mbuff Raw Buffer");
                          print_rte_mbuf(0,p_mbuff);

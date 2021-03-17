@@ -55,7 +55,6 @@
 #include <rte_event_eth_rx_adapter.h>
 #include <rte_event_eth_tx_adapter.h>
 #include "fs_eventdev.h"
-#include "fs_print_rte_ethdev_struct.h"
 
 
 void print_core_setup(void);

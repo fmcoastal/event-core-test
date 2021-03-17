@@ -80,10 +80,11 @@ char * ptr[4] = {0,0,0,0};;
 
 void Print_ip_endpt(ip_endpt_t * var,char *var_name)
 {
+char lstr[64];
     printf("%s:\n",var_name);
     printf("  IP Address : %s\n",formatIpAddr(var->ip_addr));
     printf("  Port       : %5d     0x%08x \n",var->port ,var->port );
-    printf("  HW MAC     : %s\n",formatMACAddr(&(var->MAC)));
+    printf("  HW MAC     : %s\n",format_mac_addr(&(var->MAC),lstr));
 }
 #if 1
 
@@ -172,11 +173,12 @@ uint32_t crc32(uint8_t * message, uint32_t msgsize, uint32_t crc)
 ///////////////////////////////////////////MAC///////////////////////////////////////////
 
 
-static char g_MAC_format[40];
 // returns the ":" separated string value
-char *  formatMACAddr(MacAddr_t* mac)
+//  p is input of where to place the string
+char *  format_mac_addr(MacAddr_t* mac,char * p )
 {
-         sprintf(g_MAC_format ,"%02x:%02x:%02x:%02x:%02x:%02x",
+         if ( p == NULL) return NULL;
+         sprintf( p ,"%02x:%02x:%02x:%02x:%02x:%02x",
                                      mac->addr[0],
                                      mac->addr[1],
                                      mac->addr[2],
@@ -184,8 +186,8 @@ char *  formatMACAddr(MacAddr_t* mac)
                                      mac->addr[4],
                                      mac->addr[5]
                                       );
-//    printf("i[%d]%s:%s  %s\n ",__LINE__,__FILE__,__FUNCTION__,g_MAC_format);
-    return g_MAC_format;
+//    printf("i[%d]%s:%s  %s\n ",__LINE__,__FILE__,__FUNCTION__,p);
+    return p;
 }
 
 // if the format is correct, will return 0,
@@ -320,7 +322,8 @@ MacErr:
 
 void printMAC(MacAddr_t* mac,const char * string)
 {
-    printf(" %s  %s\n ",formatMACAddr(mac),string);
+    char lstr[64];
+    printf(" %s  %s\n ",format_mac_addr(mac,lstr),string);
 }
 
 void SetMAC(MacAddr_t* Dst, MacAddr_t* Src)
@@ -449,7 +452,8 @@ int GetMacHeaderSize(uint8_t * pMACStart)
 ////////////////////////////////////////  arp  //////////////////////////////////////////
 //Arp Header
 void printArpPktData_t(ArpPktData_t *p)
-{   
+{ 
+    char lstr[64]; 
     printf("\n");
     printf("ARP Header:   %p { \n",p );
 
@@ -458,9 +462,9 @@ void printArpPktData_t(ArpPktData_t *p)
     printf("%s    uint16_t   HwAddLen;        0x%04x  offset: 0x%02lx \n" ,"",ntohs(p->HwAddLen) ,offsetof(ArpPktData_t,HwAddLen) );
     printf("%s    uint16_t   ProtocolAddLen;  0x%04x  offset: 0x%02lx \n" ,"",htons(p->ProtocolAddLen)  ,offsetof(ArpPktData_t,ProtocolAddLen));
     printf("%s    uint16_t   OpCode;          0x%04x  offset: 0x%02lx \n" ,"",htons(p->OpCode)   ,offsetof(ArpPktData_t,OpCode) );
-    printf("%s    MacAddr_t  SrcHwAddr;        %s  \n"    ,"", formatMACAddr( &p->SrcHwAddr)  );
+    printf("%s    MacAddr_t  SrcHwAddr;        %s  \n"    ,"", format_mac_addr( &p->SrcHwAddr , lstr ));
     printf("%s    uint32_t   SrcProtocolAddr   %s  \n"    ,"", formatIpAddr(ntohl(p->SrcProtocolAddr)));
-    printf("%s    MacAddr_t  TarHwAddr         %s  \n"    ,"", formatMACAddr( &p->TarHwAddr    ) );
+    printf("%s    MacAddr_t  TarHwAddr         %s  \n"    ,"", format_mac_addr( &p->TarHwAddr , lstr ));
     printf("%s    uint32_t   TarProtocolAddr   %s  \n"    ,"", formatIpAddr(ntohl(p->TarProtocolAddr)));
     printf("} \n" );
 }

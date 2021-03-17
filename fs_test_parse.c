@@ -71,6 +71,7 @@
 
 extern uint64_t g_core_messages;
 extern int64_t  g_print_interval;
+extern int      g_drop_all_traffic ;
 int64_t         g_loopback_traffic =  1;   // if =1 will swap src <->det for l2,l3,and l4 headers
 
 
@@ -515,7 +516,6 @@ static inline void Do_Event_Type_CPU( struct rte_event * p_event, unsigned lcore
 }
 
 #define BATCH_SIZE  4
-extern int g_drop_all_traffic ;extern int g_drop_all_traffic ;
 
 
 ///////////////////////////////////////////////////////////
