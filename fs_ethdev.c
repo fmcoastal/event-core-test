@@ -41,6 +41,7 @@
 #include <rte_mbuf.h>
 
 #include <rte_eventdev.h>
+#include <rte_security.h>   // for rte_security_session_get_size()
 
 #include <rte_spinlock.h>
 #include "fprintbuff.h"
@@ -590,6 +591,128 @@ void check_ports_link_status(uint32_t port_mask)
                 }
         }
 }
+
+
+
+
+#define MAX_STRING_LEN 256
+
+/* show border */
+static char bdr_str[MAX_STRING_LEN];
+
+#define STATS_BDR_FMT "========================================"
+#define STATS_BDR_STR(w, s) printf("%.*s%s%.*s\n", w, \
+        STATS_BDR_FMT, s, w, STATS_BDR_FMT)
+  
+
+
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+// show_port
+void show_port(void)
+{
+        uint16_t i = 0;
+        int ret = 0, j, k;
+
+        snprintf(bdr_str, MAX_STRING_LEN, " show - Port PMD %"PRIu64,
+                        rte_get_tsc_hz());
+        STATS_BDR_STR(10, bdr_str);
+
+        RTE_ETH_FOREACH_DEV(i) {
+                uint16_t mtu = 0;
+                struct rte_eth_link link;
+                struct rte_eth_dev_info dev_info;
+                struct rte_eth_rxq_info queue_info;
+                struct rte_eth_rss_conf rss_conf;
+
+                memset(&rss_conf, 0, sizeof(rss_conf));
+
+                snprintf(bdr_str, MAX_STRING_LEN, " Port (%u)", i);
+
+                printf("\t  -- Socket %d\n", rte_eth_dev_socket_id(i));
+                ret = rte_eth_link_get(i, &link);
+                if (ret < 0) {
+                        printf("Link get failed (port %u): %s\n",
+                               i, rte_strerror(-ret));
+                } else {
+                        printf("\t  -- link speed %d duplex %d,"
+                                        " auto neg %d status %d\n",
+                                        link.link_speed,
+                                        link.link_duplex,
+                                        link.link_autoneg,
+                                        link.link_status);
+                }
+                printf("\t  -- promiscuous (%d)\n",
+                                rte_eth_promiscuous_get(i));
+                ret = rte_eth_dev_get_mtu(i, &mtu);
+                if (ret == 0)
+                        printf("\t  -- mtu (%d)\n", mtu);
+
+                ret = rte_eth_dev_info_get(i, &dev_info);
+                if (ret != 0) {
+                        printf("Error during getting device (port %u) info: %s\n",
+                                i, strerror(-ret));
+                        return;
+                }
+
+                printf("  - queue\n");
+                for (j = 0; j < dev_info.nb_rx_queues; j++) {
+                        ret = rte_eth_rx_queue_info_get(i, j, &queue_info);
+                        if (ret == 0) {
+                                printf("\t  -- queue %d rx scatter %d"
+                                                " descriptors %d"
+                                                " offloads 0x%"PRIx64
+                                                " mempool socket %d\n",
+                                                j,
+                                                queue_info.scattered_rx,
+                                                queue_info.nb_desc,
+                                                queue_info.conf.offloads,
+                                                queue_info.mp->socket_id);
+                        }
+                }
+
+                ret = rte_eth_dev_rss_hash_conf_get(i, &rss_conf);
+                if (ret == 0) {
+                        if (rss_conf.rss_key) {
+                                printf("  - RSS\n");
+                                printf("\t  -- RSS len %u key (hex):",
+                                                rss_conf.rss_key_len);
+                                for (k = 0; k < rss_conf.rss_key_len; k++)
+                                        printf(" %x", rss_conf.rss_key[k]);
+                                printf("\t  -- hf 0x%"PRIx64"\n",
+                                                rss_conf.rss_hf);
+                        }
+                }
+
+                printf("  - cyrpto context\n");
+#ifdef RTE_LIBRTE_SECURITY
+                void *p_ctx = rte_eth_dev_get_sec_ctx(i);
+                printf("\t  -- security context - %p\n", p_ctx);
+
+                if (p_ctx) {
+                        printf("\t  -- size %u\n",
+                                        rte_security_session_get_size(p_ctx));
+                        const struct rte_security_capability *s_cap =
+                                rte_security_capabilities_get(p_ctx);
+                        if (s_cap) {
+                                printf("\t  -- action (0x%x), protocol (0x%x),"
+                                                " offload flags (0x%x)\n",
+                                                s_cap->action,
+                                                s_cap->protocol,
+                                                s_cap->ol_flags);
+//                                printf("\t  -- capabilities - oper type %x\n",
+//                                                s_cap->crypto_capabilities->op);
+                        }
+                }
+#endif
+        }
+
+        STATS_BDR_STR(50, "");
+}
+
+
+
+
 
 
 
