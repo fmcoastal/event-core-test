@@ -29,6 +29,34 @@ void ethdev_start(void);
 void check_ports_link_status(uint32_t port_mask);
 void  rx_tx_adapter_setup_internal_port(void);
 
+
+
+
+
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+
+typedef struct p_q_struct {
+    unsigned port_id;
+    unsigned port_queue;
+  } p_q_t;
+
+
+#define MAX(x,y) (x > y ? x : y )
+
+#define MAX_RX_P_Q_PER_ETH_DEV  8
+#define MAX_TX_P_Q_PER_ETH_DEV  16
+
+struct eth_queue_conf {
+        unsigned n_rx_p_q;      // number of  port/queue pairs for core to poll
+        p_q_t      rx_p_q[MAX(MAX_RX_P_Q_PER_ETH_DEV,MAX_TX_P_Q_PER_ETH_DEV)];
+} __rte_cache_aligned;
+
+
+
+
+
+
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 //RSS notes

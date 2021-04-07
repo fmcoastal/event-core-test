@@ -41,6 +41,7 @@
 
 #include <rte_spinlock.h>
 #include <rte_event_timer_adapter.h>
+#include <assert.h>
 #include "main.h"
 
 //  TEST FUNCTION INCLUDES
@@ -162,6 +163,7 @@ void usage(void)
  static void
  setup_test_funtions(void)
  {
+         assert( g_test_selection <= 0 );
          /* run the spinlock test. */
          if ( g_test_selection  == 1)
                  g_tst_func  = tm_spinlock;
@@ -181,11 +183,6 @@ void usage(void)
                  g_tst_func  = tm_timer;
          else if ( g_test_selection  == 9)
                  g_tst_func  = tm_test;
-
-
-
-
-
 
          /* Setup dummy lookup functions. */
          else

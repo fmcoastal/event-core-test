@@ -126,5 +126,14 @@ Other Items:
     dpdk tools like dpdk_devbind.py can be found in <DPDK_RELEASE>/usertools/dpdk-*
 
 
+Cross Compile Application:
+
+export FS_TOOLCHAIN_REVISION=marvell-tools-265.0
+export EXTRA_CFLAGS='-O0 -g3'
+export CROSS=$FS_BASE_DIR/sdk/$FS_SDK_REVISION/toolchain/$FS_TOOLCHAIN_REVISION/bin/aarch64-marvell-linux-gnu-
+
+export RTE_LINUX_KERNEL=$FS_BASE_DIR/sdk/$FS_SDK_REVISION/$FS_TARGET_DEVICE-release-output/build/linux-custom
+export RTE_SDK=$FS_BASE_DIR/sdk/$FS_SDK_REVISION/$FS_TARGET_DEVICE-release-output/build/dpdk
+export RTE_TARGET=build
 
 

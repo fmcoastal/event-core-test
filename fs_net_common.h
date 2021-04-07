@@ -84,9 +84,6 @@ extern  uint32_t crc32(uint8_t * message, uint32_t msgsize, uint32_t crc);
 
 
 
-
-
-
 //Source Port
 //Destination Port
 //Sequence Number
@@ -166,7 +163,7 @@ extern  int  CompareMAC(MacAddr_t* mac0, MacAddr_t* mac1);
 //  MAC_Hdr_t functions
 
 //  swaps the src and destination mac address in a MAC_Hdr_t
-inline void SwapMAC(MAC_Hdr_t  *p) 
+static inline void SwapMAC(MAC_Hdr_t  *p) 
 {
    uint8_t tmp;
    int i;
@@ -240,7 +237,7 @@ extern  char * formatIPAddr(uint32_t IpAddr);
 
 extern  void printIPv4_Hdr_t(IPv4_Hdr_t *hdr);
 
-inline void SwapIPv4_Hdr_IPaddr(IPv4_Hdr_t  *p) 
+static inline void SwapIPv4_Hdr_IPaddr(IPv4_Hdr_t  *p) 
 {                               
    uint32_t tmp = p->SrcIPAddr;         
    p->SrcIPAddr = p->DstIPAddr ;
@@ -336,7 +333,7 @@ typedef struct
 
 
 
-inline void SwapUDP_Hdr_Ports(UDP_Hdr_t *p) 
+static inline void SwapUDP_Hdr_Ports(UDP_Hdr_t *p) 
 {                               
    uint16_t tmp = p->SrcPort;         
    p->SrcPort = p->DstPort ;

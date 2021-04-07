@@ -1271,6 +1271,8 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 /////
 #define TIMER_ADAPTER
 #ifdef TIMER_ADAPTER
+
+#define TIMER_EVENT_QUEUE  1
       timer_event_init();
       timer_event_start();
 #endif
@@ -1333,6 +1335,39 @@ int ethdev_loop( __attribute__((unused)) void * arg)
     event_dev_id   = g_glob.event_dev_id;          // id of my event device
     event_port_id  = core_2_evt_port_id[ lcore_id ]; // for now, I have 1 port associated with 1 core.  
 
+    if (lcore_id == 23 )  
+    {
+ #ifdef TIMER_ADAPTER
+         // Set up timer event structure to send a timerout via eventdev to a core
+  
+         p_ev_timer = &g_ev_timer;
+  
+         p_ev_timer = gen_timer_ev( p_ev_timer,                 /* struct rte_event_timer *   */
+                                     0x07734 ,                  /* uint32_t flow_id           */
+                                     RTE_SCHED_TYPE_PARALLEL,   /* uint8_t  sched_type        */
+                                     1,                         /* uint8_t  evt_queue         */
+                                     0x40,                      /* uint8_t evt_queue_priority */
+                                     (void *)p_ev_timer );      /* void * evt_ptr */
+  
+   #ifdef PRINT_CALL_ARGUMENTS
+         FONT_CALL_ARGUMENTS_COLOR();
+         printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,lcore_id);
+         FONT_NORMAL();
+   #endif
+         print_rte_event_timer ( 1, "g_ev_timer",&(g_ev_timer));
+         CALL_RTE("rte_event_timer_arm_burst() ");
+         ret = rte_event_timer_arm_burst( g_glob.timer_100ms , &p_ev_timer, 1 );
+         if( ret != 1 )
+         {
+              printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
+              printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
+              rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
+         }
+
+#endif  // event timer
+
+    }
+
     if( (lcore_id == 20 )  && ( g_core_messages == 1))
     {
         // cmd line option to send inter-core operations
@@ -1354,7 +1389,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
         p_ev = gen_ev( p_ev,                               /* struct rte_event * p_ev     */
                        0xdead,                             /* uint32_t flow_id            */
                        RTE_SCHED_TYPE_PARALLEL,            /* uint8_t  sched_type         */
-                       1 ,     /* core 20 message queue */ /* uint8_t  evt_queue          */
+                       TIMER_EVENT_QUEUE ,     /* core 20 message queue */ /* uint8_t  evt_queue          */
                        0x40 ,  /* core 20 msg queue pri */ /* uint8_t  evt_queue_priority */
                        (void *) core_message[core_2_message[lcore_id]] /* void *evt_ptr) */
                        );
@@ -1380,35 +1415,6 @@ int ethdev_loop( __attribute__((unused)) void * arg)
              rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
         }
 
-
-#ifdef TIMER_ADAPTER
-         // Set up timer event structure to send a timerout via eventdev to a core
-  
-         p_ev_timer = &g_ev_timer;
-  
-         p_ev_timer = gen_timer_ev( p_ev_timer,                 /* struct rte_event_timer *   */
-                                     0x07734 ,                  /* uint32_t flow_id           */
-                                     RTE_SCHED_TYPE_PARALLEL,   /* uint8_t  sched_type        */
-                                     0,                         /* uint8_t  evt_queue         */
-                                     0x80,                      /* uint8_t evt_queue_priority */
-                                     (void *)p_ev_timer );      /* void * evt_ptr */
-  
-   #ifdef PRINT_CALL_ARGUMENTS
-         FONT_CALL_ARGUMENTS_COLOR();
-         printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,lcore_id);
-         FONT_NORMAL();
-   #endif
-         print_rte_event_timer ( 1, "g_ev_timer",&(g_ev_timer));
-         CALL_RTE("rte_event_timer_arm_burst() ");
-         ret = rte_event_timer_arm_burst( g_glob.timer_100ms , &p_ev_timer, 1 );
-         if( ret != 1 )
-         {
-              printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
-              printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
-              rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
-         }
-
-#endif  // event timer
 
 
    } // end lcore id == 0 && put a message in
@@ -1466,23 +1472,19 @@ int ethdev_loop( __attribute__((unused)) void * arg)
             else if (events[i].event_type == RTE_EVENT_TYPE_TIMER   )   // evemt -> timer  
             {
 
+ #ifdef TIMER_ADAPTER
                  printf("****    c%d) Received %d Timer events from evt_port_id %d**** \n",lcore_id,nb_rx,event_port_id);
 
-                 print_rte_event( 0, "event[i]",&events[i]);
-                 printf(" Message:   %s\n", timer_message[core_2_message [lcore_id] ] );
-
-                 printf("  c%d) Send timer message to next evt_queue (aka core for me)  %d queue\n",
-                                   lcore_id
-                                   ,core_2_next_evt_queue_id[lcore_id]);
+//                 print_rte_event( 0, "event[i]",&events[i]);
 
                  p_ev_timer = events[i].event_ptr;
                  // set to forward to next core.
                  p_ev_timer->state          = RTE_EVENT_TIMER_NOT_ARMED;
-                 p_ev_timer->ev.queue_id    = core_2_next_evt_queue_id[lcore_id];
+                 // send timer event to same core.
+                 p_ev_timer->ev.queue_id    = TIMER_EVENT_QUEUE ;
                  // set operation to forward packet
                  //  p_ev_timer->ev.op             = RTE_EVENT_OP_FORWARD;
                  p_ev_timer->ev.flow_id        += 1;
-
 
                  ret= rte_event_timer_arm_burst( g_glob.timer_100ms , &p_ev_timer, 1 );
 
@@ -1492,7 +1494,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                       printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
                       rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
                  }
-
+#endif
                     
             }
             else if (events[i].event_type == RTE_EVENT_TYPE_ETHDEV )  // event -> etherent packet 

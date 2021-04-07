@@ -24,16 +24,16 @@ elif [ "$1" == "parse" ] ; then
 rm fs_test.c
 rm fs_test.h
 
-ln fs_test_parse.c  fs_test.c
-ln fs_test_parse.h  fs_test.h
+ln -s  fs_test_parse.c  fs_test.c
+ln -s  fs_test_parse.h  fs_test.h
 
 elif [ "$1" == "rss" ] ; then
 
 rm fs_test.c
 rm fs_test.h
 
-ln fs_test_rss.c  fs_test.c
-ln fs_test_rss.h  fs_test.h
+ln -s fs_test_rss.c  fs_test.c
+ln -s fs_test_rss.h  fs_test.h
 
 else
   echo "unrecognize argument"

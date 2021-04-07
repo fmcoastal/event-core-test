@@ -71,8 +71,8 @@ USE_GDB="YES"
 ifeq ($(USE_GDB),"NO")
 CFLAGS += -O3
 else  #debug info
-CFLAGS += -g     
-CFLAGS += -O
+CFLAGS += -g3     
+CFLAGS += -O0
 endif
 
 
