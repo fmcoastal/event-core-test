@@ -133,7 +133,6 @@ int test_setup( __attribute__((unused)) void * arg)
 
 
     g_glob.enabled_eth_port_mask = 0x0F ;            // cmd line -p argument - here I hardwired :-0    
-    g_glob.nb_eth_ports_available = 0;               // calculated based on  g_glob.enabled_port_mask
     g_glob.event_dev_id = 0;                         // event dev_id index/handle => SSO  0
 
     memset(&(g_glob.def_p_conf), 0, sizeof(struct rte_event_port_conf));  

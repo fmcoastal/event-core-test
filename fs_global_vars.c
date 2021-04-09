@@ -44,11 +44,12 @@
 
 #include <rte_spinlock.h>
 #include "fs_extras.h"
+#include "fs_net_common.h"
 
-#include "fs_eventdev.h"               // structures used in configuring the 
-                                       // event dev components
-#include "fs_eventdev.h"  // for printing ethaddrs (mac addresses)
-#include "fs_print_rte_mbuff.h"  // for printing ethaddrs (mac addresses)
+#include "fs_ethdev.h"           
+#include "fs_eventdev.h"           // structures used in configuring the 
+                                   // event dev components
+#include "fs_print_rte_mbuff.h"    // for printing ethaddrs (mac addresses)
 
 #include "fs_global_vars.h"
 
@@ -58,8 +59,9 @@ global_data_t g_glob={0};
 
 void print_global_data (global_data_t *p)
 {
-char eth_addr[30];
+char string[32];
 int i,j;
+
    printf("%s",C_RED);
    printf(" uint16_t  enabled_eth_port_mask            = %d \n",p->enabled_eth_port_mask);
    printf(" uint16_t  nb_eth_ports_available           = %d \n",p->nb_eth_ports_available);
@@ -67,13 +69,16 @@ int i,j;
    printf(" struct    rte_mempool* p_pktmbuf_pool  = %p \n",p->p_pktmbuf_pool);
 
    printf("\n");
-   printf("------------ eth_dev  port mac addresses  -----------\n");
+   printf("------------ eth_dev config data  -----------\n");
    {
-      printf(" struct rte_ether_addr      eth_addr[RTE_MAX_ETHPORTS];");
+      printf(" struct rte_eth_conf eth_port_cfg_data[RTE_MAX_ETHPORTS];");
       for ( i = 0 ; i < p->nb_eth_ports_available ; i++)
       {
-         if ( i%4 == 0) printf("\n");
-         printf("  %d) %s",i,rte_format_mac_addr(eth_addr,&( p->eth_addr[i])));
+         rte_eth_dev_get_name_by_port( i , string);
+         printf("    uint16_t eth port_id                 %d   (%s)\n",i,string);
+         printf("    struct   rte_ether_addr  eth_addr:   %s  \n",format_rte_mac_addr(string,&(p->eth_port_cfg_data[i].eth_addr)));
+         printf("    uint16_t nb_rx_queues:               %d  \n", p->eth_port_cfg_data[i].nb_rx_queues);
+         printf("    uint16_t nb_tx_queues:               %d  \n", p->eth_port_cfg_data[i].nb_tx_queues);
       }
       printf("\n");
    }

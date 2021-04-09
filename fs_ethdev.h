@@ -36,25 +36,25 @@ void  rx_tx_adapter_setup_internal_port(void);
 ///////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////
 
-typedef struct p_q_struct {
-    unsigned port_id;
-    unsigned port_queue;
-  } p_q_t;
-
-
 #define MAX(x,y) (x > y ? x : y )
 
 #define MAX_RX_P_Q_PER_ETH_DEV  8
 #define MAX_TX_P_Q_PER_ETH_DEV  16
 
-struct eth_queue_conf {
-        unsigned n_rx_p_q;      // number of  port/queue pairs for core to poll
-        p_q_t      rx_p_q[MAX(MAX_RX_P_Q_PER_ETH_DEV,MAX_TX_P_Q_PER_ETH_DEV)];
-} __rte_cache_aligned;
+typedef struct p_q_struct {
+    unsigned port_id;
+    unsigned port_queue;
+  } p_q_t;
 
+struct eth_port_conf {
 
+    struct    rte_ether_addr eth_addr;  // interface MAC address
+    uint16_t                 nb_rx_queues;
+    uint16_t                 nb_tx_queues;
 
+};
 
+//} __rte_cache_aligned;
 
 
 ///////////////////////////////////////////////////////

@@ -85,7 +85,7 @@ char BAD_POINTER[]={"BAD POINTER"};
 /*
  *   converts a ethernet address into a printable String
  */
-char * rte_format_mac_addr(char * str,struct rte_ether_addr *m )
+char * format_rte_mac_addr(char * str,struct rte_ether_addr *m )
 {
    if ( str == NULL) return BAD_POINTER;
    sprintf(str,"%02x:%02x:%02x:%02x:%02x:%02x",m->addr_bytes[0]

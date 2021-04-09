@@ -163,7 +163,7 @@ void usage(void)
  static void
  setup_test_funtions(void)
  {
-         assert( g_test_selection <= 0 );
+//         assert( g_test_selection <= 0 );
          /* run the spinlock test. */
          if ( g_test_selection  == 1)
                  g_tst_func  = tm_spinlock;

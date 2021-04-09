@@ -26,7 +26,8 @@ struct rte_event_timer * gen_timer_ev( struct rte_event_timer * p_evt_timer,
 
 
 
-
+// used for single timer event for printing messages/stats
+extern struct rte_event_timer g_ev_timer;    // use this to encode a timer event.
 
 void print_rte_event_timer_adapter_conf (int indent,const char* string,int id,struct rte_event_timer_adapter_conf *p);
 void print_rte_event_timer_adapter_info (int indent,const char* string,int id,struct rte_event_timer_adapter_info  *p);

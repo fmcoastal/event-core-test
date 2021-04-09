@@ -269,619 +269,9 @@ void print_global_data(global_data_t *p);
 
 #endif
 
-
-  
-
-
-// initialize each ethernet interface
-//      rte_eth_dev_info_get()             Get Default cfg from dpdk
-//      Adjust default config to what we need.
-//      rte_eth_dev_configure()            Create the interface - based on cfg
-//      rte_eth_dev_adjust_nb_rx_tx_desc() adjust the number of descriptors
-//      rte_eth_macaddr_get()              ---
-//      rte_eth_rx_queue_setup()           allowocate rx queues
-//      rte_eth_tx_queue_setup()           allocate tx Queues
-//      prte_eth_promiscuous_enable()      put interface in Promiscuous mode.
-void   initialize_eth_dev_ports(void)
-{         
-    uint16_t port_id;
-    int ret;
-    uint16_t nb_rxd = RTE_RX_DESC_DEFAULT;
-    uint16_t nb_txd = RTE_TX_DESC_DEFAULT;
-    uint32_t nb_mbufs;
-    uint16_t nb_ports;
-    char     string[64];
-    int16_t  eth_port_id;
-    uint32_t i;
-
-    struct rte_eth_conf port_conf = {
-           .rxmode = {
-                  .max_rx_pkt_len = RTE_ETHER_MAX_LEN,
-                  .split_hdr_size = 0,
-           },
-           .txmode = {
-                   .mq_mode = ETH_MQ_TX_NONE,
-           },
-    };
-
-    WAI();
-// for event mode 
-// note the RSS reference    
-    port_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
-    port_conf.rx_adv_conf.rss_conf.rss_key = NULL;
-    port_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
-
-    print_rte_eth_conf(0,"default: port_conf",0,&port_conf);    
-
-//   allocate mbuffs for the eth-dev interface HW.
-//     first, how many ports, and confirm against eal_init
-    nb_ports = 0 ;
-    for ( i = 0 ; i < (8*sizeof(uint16_t)) ; i++ )   // size of g_glob.enabled_port_mask
-    {
-       if ( (g_glob.enabled_eth_port_mask  & (0x01 << i))  != 0) { nb_ports++; printf(".");}
-    }       
-    printf("\n g_glob.enabled_eth_port_mask (0x%04x)  thinks we have %d ethernets port in use \n",   
-                                                       g_glob.enabled_eth_port_mask,
-                                                       nb_ports );
-
-    printf("rte_eal_init() thinks I have the following ethdev device\n");
-    // print eth port ids  that rte_init sees
-    {
-        RTE_ETH_FOREACH_DEV(eth_port_id)
-        {
-            /* get (-ENODEV) or (-EINVAL) if port_id is invalid. */
-            if ( rte_eth_dev_get_name_by_port( eth_port_id , string) == 0)
-            {
-                printf("  ----> portid 0x%x enabled PCIe:  %s \n",eth_port_id,string );
-            }
-        }
-     }
-
-
-    // allocate memory
-    nb_mbufs = RTE_MAX(nb_ports * (RTE_ETHDEV_RX_DESC_DEFAULT +
-                                   RTE_ETHDEV_TX_DESC_DEFAULT +
-                                   MAX_PKT_BURST + rte_lcore_count() *
-                                   MEMPOOL_CACHE_SIZE), 8192U);
-
-    printf(" We think we need  %d mbufs\n",nb_mbufs );
-    /* create the mbuf pool */
-
-   
-    CALL_RTE("rte_pktmbuf_pool_create()");    
-    g_glob.p_pktmbuf_pool = rte_pktmbuf_pool_create("mbuf_pool",
-
-                    nb_mbufs, MEMPOOL_CACHE_SIZE, 0,
-                    RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
-    if (g_glob.p_pktmbuf_pool == NULL)
-            rte_panic("Cannot init mbuf pool (g_p_pktmbuf_pool)  \n");
-        
-
-///////////////////////////////////////
-///////////////////////////////////////
-    RTE_ETH_FOREACH_DEV(port_id) {
-         struct rte_eth_conf local_port_conf = port_conf;
-         struct rte_eth_dev_info dev_info;
-         struct rte_eth_rxconf rxq_conf;
-         struct rte_eth_txconf txq_conf;
-
-          /* skip ports that are not enabled */
-          if ((g_glob.enabled_eth_port_mask & (1 << port_id)) == 0) {
-                  printf("Skipping disabled port %u\n", port_id);
-                  continue;
-          }
-          g_glob.nb_eth_ports_available++;
-         /* init port */
-          printf("%sInitializing port %u... %s\n",C_RED, port_id,C_WHITE);
-          printf ("%s %s  portid: %d %s\n",C_RED,__FUNCTION__,port_id,C_WHITE);
-          fflush(stdout);
-
-#ifdef PRINT_CALL_ARGUMENTS
-               FONT_CALL_ARGUMENTS_COLOR();
-               printf(  " Call Args: port_id %d  dev_info: \n",port_id);
-               FONT_NORMAL();
-#endif
-          CALL_RTE("rte_eth_dev_info_get()");    
-          ret = rte_eth_dev_info_get(port_id, &dev_info);
-          if (ret != 0)
-                  rte_panic("Error during getting device (port %u) info: %s\n",
-                            port_id, strerror(-ret));
-          local_port_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
-          if (local_port_conf.rx_adv_conf.rss_conf.rss_hf != port_conf.rx_adv_conf.rss_conf.rss_hf) {
-                  printf("Port %u modified RSS hash function based on hardware support,"
-                        "requested:%#"PRIx64" configured:%#"PRIx64"",
-                          port_id,
-                          port_conf.rx_adv_conf.rss_conf.rss_hf,
-                          local_port_conf.rx_adv_conf.rss_conf.rss_hf );
-          }
-
-          if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
-                  local_port_conf.txmode.offloads |=
-                          DEV_TX_OFFLOAD_MBUF_FAST_FREE;
- 
-#ifdef PRINT_CALL_ARGUMENTS
-          FONT_CALL_ARGUMENTS_COLOR();
-          printf(  " Call Args: port_id %d  rx_queuess:%d  tx_queues %d  local_port_conf: \n",port_id,1,1);
-          FONT_NORMAL();
-#endif
-          CALL_RTE("rte_eth_dev_configure()");    
-          ret = rte_eth_dev_configure(port_id, 1, 1, &local_port_conf);
-          if (ret < 0)
-                  rte_panic("Cannot configure device: err=%d, port=%u\n",
-                            ret, port_id);
-
- #ifdef PRINT_CALL_ARGUMENTS
-          FONT_CALL_ARGUMENTS_COLOR();
-          printf(  " Call Args: port_id %d  nb_rxd :%d  nb_txd:%d \n",port_id,nb_rxd,nb_txd);
-          FONT_NORMAL();
-#endif
-          CALL_RTE("call rte_eth_dev_adjust_nb_rx_tx_desc()");    
-          ret = rte_eth_dev_adjust_nb_rx_tx_desc(port_id, &nb_rxd,
-                                                 &nb_txd);
-          if (ret < 0)
-                  rte_panic("Cannot adjust number of descriptors: err=%d, port=%u\n",
-                            ret, port_id);
-
-          CALL_RTE("call rte_eth_macaddr_get()");    
-          rte_eth_macaddr_get(port_id, &g_glob.eth_addr[port_id]);
-
-
-// FIX THIS LATER --  will need more than 1 queue on Rx and 1 queue on tx.
-
-          /*******************************************/ 
-          /****  init one RX queue on each port   ****/
-          /*******************************************/ 
-          fflush(stdout);
-          printf("port_id = %d\n",port_id);
-          printf("nb_rxd = %d\n",nb_rxd);
-          printf("rte_eth_dev_socket_id(port_id) = %d\n",rte_eth_dev_socket_id(port_id));
-          rxq_conf = dev_info.default_rxconf;
-          rxq_conf.offloads = local_port_conf.rxmode.offloads;
-
-#ifdef PRINT_CALL_ARGUMENTS
-          FONT_CALL_ARGUMENTS_COLOR();
-          printf(" int rte_eth_rx_queue_setup( uint16_t port_id, \n"
-                 "                             uint16_t rx_queue_id,\n"
-                 "                             uint16_t 	nb_rx_desc,\n"
-                 "                             unsigned int 	socket_id,\n"
-                 "                             const struct rte_eth_rxconf * 	rx_conf,\n"
-                 "                             struct rte_mempool * 	mb_pool \n"
-                 "                             )\n");
-          printf( " Call Args: port_id %d  rx_queue_id:%d  nb_rx_desc:%d  socketid:%d  rx_conf:   rte_mempool* \n",
-                                     port_id,           0,      nb_rxd,  rte_eth_dev_socket_id(port_id));
-          FONT_NORMAL();
-          print_rte_eth_rxconf( 0, &rxq_conf);
-#endif
-          CALL_RTE("rte_eth_rx_queue_setup()");    
-          ret = rte_eth_rx_queue_setup(port_id, 0, nb_rxd,
-                                       rte_eth_dev_socket_id(port_id),
-                                       &rxq_conf,
-                                       g_glob.p_pktmbuf_pool);
-          if (ret < 0)
-                  rte_panic("rte_eth_rx_queue_setup:err=%d, port=%u\n",
-                            ret, port_id);
-
-          /**********************************/ 
-          /* init one TX queue on each port */
-          /**********************************/ 
-          fflush(stdout);
-          txq_conf = dev_info.default_txconf;
-          txq_conf.offloads = local_port_conf.txmode.offloads;
-
-          print_rte_eth_txconf( 0, &txq_conf);
-          CALL_RTE("rte_eth_tx_queue_setup()");    
-          ret = rte_eth_tx_queue_setup(port_id, 0, nb_txd,
-                          rte_eth_dev_socket_id(port_id),
-                          &txq_conf);
-          if (ret < 0)
-                  rte_panic("rte_eth_tx_queue_setup:err=%d, port=%u\n",
-                            ret, port_id);
-
-          CALL_RTE("rte_eth_promiscuous_enable()\n");    
-          rte_eth_promiscuous_enable(port_id);
-
-          printf("Port %u,MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n\n",
-                  port_id,
-                  g_glob.eth_addr[port_id].addr_bytes[0],
-                  g_glob.eth_addr[port_id].addr_bytes[1],
-                  g_glob.eth_addr[port_id].addr_bytes[2],
-                  g_glob.eth_addr[port_id].addr_bytes[3],
-                  g_glob.eth_addr[port_id].addr_bytes[4],
-                  g_glob.eth_addr[port_id].addr_bytes[5]);
-    }  // FOR_EACH_ETHDEV
-
-
-}
-
-
-//////////////////////////////////////////////
-//////////////////////////////////////////////
-//  Start all the ethernet interfaces.
-void ethdev_start(void)
-{
-    uint16_t port_id;
-    int ret = 0;
-
-    RTE_ETH_FOREACH_DEV(port_id) {
-         /* skip ports that are not enabled */
-         if ((g_glob.enabled_eth_port_mask & (1 << port_id)) == 0)
-                         continue;
-
-
-
-#ifdef PRINT_CALL_ARGUMENTS
-    FONT_CALL_ARGUMENTS_COLOR();
-    printf(  " int rte_eth_dev_start( uint16_t port_id)\n");
-    printf(  " Call Args: port_id %d \n",port_id);
-    FONT_NORMAL();
-#endif
-    CALL_RTE("rte_eth_dev_start()");
-    ret = rte_eth_dev_start(port_id);
-    if (ret < 0)
-         rte_panic("rte_eth_dev_start:err=%d, port=%u\n", ret, port_id);
-    }
-
-}
-
-//////////////////////////////////////////////
-//////////////////////////////////////////////
-/* Check the link status of all ports in up to 9s, and print them finally */
-void check_ports_link_status(uint32_t port_mask)
-{
-#define CHECK_INTERVAL 100 /* 100ms */
-#define MAX_CHECK_TIME 90 /* 9s (90 * 100ms) in total */
-        uint16_t port_id;
-        uint8_t count, all_ports_up, print_flag = 0;
-        struct rte_eth_link link;
-        int ret;
-
-        WAI();
-        printf("\nChecking link status...");
-        fflush(stdout);
-        for (count = 0; count <= MAX_CHECK_TIME; count++) {
-                if (g_force_quit)
-                        return;
-                all_ports_up = 1;
-                RTE_ETH_FOREACH_DEV(port_id) {
-                        if (g_force_quit)
-                                return;
-                        if ((port_mask & (1 << port_id)) == 0)
-                                continue;
-                        memset(&link, 0, sizeof(link));
-                        ret = rte_eth_link_get_nowait(port_id, &link);
-                        if (ret < 0) {
-                                all_ports_up = 0;
-                                if (print_flag == 1)
-                                        printf("Port %u link get failed: %s\n",
-                                                port_id, rte_strerror(-ret));
-                                continue;
-                        }
-                        /* print link status if flag set */
-                        if (print_flag == 1) {
-                                if (link.link_status)
-                                        printf(
-                                        "Port%d Link Up. Speed %u Mbps - %s\n",
-                                                port_id, link.link_speed,
-                                (link.link_duplex == ETH_LINK_FULL_DUPLEX) ?
-                                        ("full-duplex") : ("half-duplex\n"));
-                                else
-                                        printf("Port %d Link Down\n", port_id);
-                                continue;
-                        }
-                        /* clear all_ports_up flag if any link down */
-                        if (link.link_status == ETH_LINK_DOWN) {
-                                all_ports_up = 0;
-                                break;
-                        }
-                }
-                /* after finally printing all link status, get out */
-                if (print_flag == 1)
-                        break;
-
-                if (all_ports_up == 0) {
-                        printf(".");
-                        fflush(stdout);
-                        rte_delay_ms(CHECK_INTERVAL);
-                }
-
-                /* set the print_flag if all ports up or timeout */
-                if (all_ports_up == 1 || count == (MAX_CHECK_TIME - 1)) {
-                        print_flag = 1;
-                        printf("done\n");
-                }
-        }
-}
-
-
-
-
-#define MAX_STRING_LEN 256
-
-/* show border */
-static char bdr_str[MAX_STRING_LEN];
-
-#define STATS_BDR_FMT "========================================"
-#define STATS_BDR_STR(w, s) printf("%.*s%s%.*s\n", w, \
-        STATS_BDR_FMT, s, w, STATS_BDR_FMT)
-  
-
-
-////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////
-// show_port
-void show_port(void)
-{
-        uint16_t i = 0;
-        int ret = 0, j, k;
-
-        snprintf(bdr_str, MAX_STRING_LEN, " show - Port PMD %"PRIu64,
-                        rte_get_tsc_hz());
-        STATS_BDR_STR(10, bdr_str);
-
-        RTE_ETH_FOREACH_DEV(i) {
-                uint16_t mtu = 0;
-                struct rte_eth_link link;
-                struct rte_eth_dev_info dev_info;
-                struct rte_eth_rxq_info queue_info;
-                struct rte_eth_rss_conf rss_conf;
-
-                memset(&rss_conf, 0, sizeof(rss_conf));
-
-                snprintf(bdr_str, MAX_STRING_LEN, " Port (%u)", i);
-
-                printf("\t  -- Socket %d\n", rte_eth_dev_socket_id(i));
-                ret = rte_eth_link_get(i, &link);
-                if (ret < 0) {
-                        printf("Link get failed (port %u): %s\n",
-                               i, rte_strerror(-ret));
-                } else {
-                        printf("\t  -- link speed %d duplex %d,"
-                                        " auto neg %d status %d\n",
-                                        link.link_speed,
-                                        link.link_duplex,
-                                        link.link_autoneg,
-                                        link.link_status);
-                }
-                printf("\t  -- promiscuous (%d)\n",
-                                rte_eth_promiscuous_get(i));
-                ret = rte_eth_dev_get_mtu(i, &mtu);
-                if (ret == 0)
-                        printf("\t  -- mtu (%d)\n", mtu);
-
-                ret = rte_eth_dev_info_get(i, &dev_info);
-                if (ret != 0) {
-                        printf("Error during getting device (port %u) info: %s\n",
-                                i, strerror(-ret));
-                        return;
-                }
-
-                printf("  - queue\n");
-                for (j = 0; j < dev_info.nb_rx_queues; j++) {
-                        ret = rte_eth_rx_queue_info_get(i, j, &queue_info);
-                        if (ret == 0) {
-                                printf("\t  -- queue %d rx scatter %d"
-                                                " descriptors %d"
-                                                " offloads 0x%"PRIx64
-                                                " mempool socket %d\n",
-                                                j,
-                                                queue_info.scattered_rx,
-                                                queue_info.nb_desc,
-                                                queue_info.conf.offloads,
-                                                queue_info.mp->socket_id);
-                        }
-                }
-
-                ret = rte_eth_dev_rss_hash_conf_get(i, &rss_conf);
-                if (ret == 0) {
-                        if (rss_conf.rss_key) {
-                                printf("  - RSS\n");
-                                printf("\t  -- RSS len %u key (hex):",
-                                                rss_conf.rss_key_len);
-                                for (k = 0; k < rss_conf.rss_key_len; k++)
-                                        printf(" %x", rss_conf.rss_key[k]);
-                                printf("\t  -- hf 0x%"PRIx64"\n",
-                                                rss_conf.rss_hf);
-                        }
-                }
-
-                printf("  - cyrpto context\n");
-#ifdef RTE_LIBRTE_SECURITY
-                void *p_ctx = rte_eth_dev_get_sec_ctx(i);
-                printf("\t  -- security context - %p\n", p_ctx);
-
-                if (p_ctx) {
-                        printf("\t  -- size %u\n",
-                                        rte_security_session_get_size(p_ctx));
-                        const struct rte_security_capability *s_cap =
-                                rte_security_capabilities_get(p_ctx);
-                        if (s_cap) {
-                                printf("\t  -- action (0x%x), protocol (0x%x),"
-                                                " offload flags (0x%x)\n",
-                                                s_cap->action,
-                                                s_cap->protocol,
-                                                s_cap->ol_flags);
-//                                printf("\t  -- capabilities - oper type %x\n",
-//                                                s_cap->crypto_capabilities->op);
-                        }
-                }
-#endif
-        }
-
-        STATS_BDR_STR(50, "");
-}
-
-
-
-
-
-
-
-////////////////////////////////////////////////////
-////////////////////////////////////////////////////
-//  Connect  interface rx/tx queues (ethdev)  to event-dev queues
-//
-//  malloc()                           -allocates memory to save an index to each rx_adapter
-//  rte_event_eth_rx_adapter_create()  -create the adapter 
-
-void  rx_tx_adapter_setup_internal_port(void)
-{
-    struct   rte_event_eth_rx_adapter_queue_conf eth_q_conf;
-    uint16_t adapter_id = 0;
-    int      ret;
-    int      i,j;
-WAI();
-
-
-//////////////////////////////////////////////
-/////////// configure rx adapters ////////////
-////////////////////////////////////////////// 
-
-     memset(&eth_q_conf, 0, sizeof(eth_q_conf));
-
-//  walk through the aray of adapter Indexes
-   for ( i = 0 ; i < g_glob.rx_adptr.nb_rx_adptr ; i++ )
-   {
-
-//       Create the adpater
-         adapter_id = g_glob.rx_adptr.rx_adptr[i]; 
-#ifdef PRINT_CALL_ARGUMENTS
-         FONT_CALL_ARGUMENTS_COLOR();
-         printf("int rte_event_eth_rx_adapter_create( uint8_t   id,\n"
-                "                                     uint8_t 	dev_id,\n"
-                "                                     struct rte_event_port_conf * port_config\n" 
-                "                                     )\n");	
-         printf(  " Call Args: adapter_id %d  event_dev_id %d  rte_event_port_conf: \n",
-                                                               adapter_id,
-                                                               g_glob.event_dev_id);
-         FONT_NORMAL();
-#endif
-
-         print_rte_event_port_conf(1,"---create--- def_p_conf",adapter_id,&g_glob.def_p_conf);
-         CALL_RTE("rte_event_eth_rx_adapter_create()");
-         ret = rte_event_eth_rx_adapter_create(adapter_id,
-                                                g_glob.event_dev_id,
-                                                &g_glob.def_p_conf);
-         if (ret)
-               rte_panic("Failed to create rx adapter[%d]\n", adapter_id);
-
-//       now add connections between eth dev and event dev
-         for( j = 0 ; j <  g_glob.rx_adptr.nb_rx_adptr_add; j++)
-         {
-            if(g_glob.rx_adptr.rx_adptr[i] == g_glob.rx_adptr.rx_adptr_add[j].adapter_id)
-            {
-         /* Configure user requested sched type*/
-                 eth_q_conf.ev.event_type     = RTE_EVENT_TYPE_ETHDEV  ;        // uint32_t event_type:4;
-                 eth_q_conf.ev.sub_event_type = RTE_EVENT_TYPE_ETH_RX_ADAPTER ; // uint32_t sub_event_type:8;
-                 eth_q_conf.ev.sched_type     = g_glob.rx_adptr.rx_adptr_add[j].sched_type ;     // handle incomming traffic as ordered
-                 eth_q_conf.ev.op             = RTE_EVENT_OP_NEW;                                // uint8_t op:2; NEW,FORWARD or RELEASE  Really Create a flow, reuse a flow, delete a few.
-                 eth_q_conf.ev.priority       = g_glob.rx_adptr.rx_adptr_add[j].priority;        //  0x80 - set priority above eth traffic (0x80) 
-                 eth_q_conf.ev.queue_id       = g_glob.rx_adptr.rx_adptr_add[j].event_dev_queue; //  the event queue the WQE will be put in
-        
-#ifdef PRINT_CALL_ARGUMENTS
-                 FONT_CALL_ARGUMENTS_COLOR();
-                 printf(" int rte_event_eth_rx_adapter_queue_add( uint8_t  id,\n"
-                        "                                         uint16_t eth_dev_id,\n"
-                        "                                         int32_t 	rx_queue_id,\n"
-                        "                                         const struct rte_event_eth_rx_adapter_queue_conf * 	conf\n" 
-                        "                                        )\n");	
-                 printf(" Call Args: id:rx_adapter_id %d  eth_dev_id:port_id %d  rx_queue_id: %d struct rte_event_eth_rx_adapter_queue_conf:\n",
-                                      g_glob.rx_adptr.rx_adptr_add[j].adapter_id, 
-                                      g_glob.rx_adptr.rx_adptr_add[j].eth_dev_port,
-                                      g_glob.rx_adptr.rx_adptr_add[j].eth_dev_queue);
-                 FONT_NORMAL();
-#endif
-                 print_rte_event_eth_rx_adapter_queue_conf(1,"--add-- eth_q_conf",
-                                                    g_glob.rx_adptr.rx_adptr_add[j].adapter_id,
-                                                    &eth_q_conf);
-                 CALL_RTE("rte_event_eth_rx_adapter_queue_add()");
-                 ret = rte_event_eth_rx_adapter_queue_add(  g_glob.rx_adptr.rx_adptr_add[j].adapter_id, 
-                                                            g_glob.rx_adptr.rx_adptr_add[j].eth_dev_port,
-                                                            g_glob.rx_adptr.rx_adptr_add[j].eth_dev_queue, 
-                                                            &eth_q_conf);
-         if (ret)
-              rte_panic("Failed to add queues to Rx adapter\n");
-
-            }
-         }
-
-//       Start the adpater
-         CALL_RTE("rte_event_eth_rx_adapter_start(uint8_t id)");
-         ret = rte_event_eth_rx_adapter_start(adapter_id);
-         if (ret)
-              rte_panic("Rx adapter[%d] start Failed\n", adapter_id);
-
-    }  // loop next adapter
-
-
-//////////////////////////////////////////////
-/////////// configure tx adapters ////////////
-////////////////////////////////////////////// 
- 
-//  walk through the aray of adapter Indexes
-   for ( i = 0 ; i < g_glob.tx_adptr.nb_tx_adptr ; i++ )
-   {
-//       Create the adpater
-         adapter_id = g_glob.tx_adptr.tx_adptr[i]; 
-
-#ifdef PRINT_CALL_ARGUMENTS
-         FONT_CALL_ARGUMENTS_COLOR();
-         printf("int rte_event_eth_tx_adapter_create( uint8_t id, \n"
-                "                                     uint8_t dev_id,\n"
-                "                                     struct rte_event_port_conf * 	port_config \n"
-                "                                     )\n");	
-         printf(" Call Args: adpater_id: %d, event_dev_id:%d, struct def_p_conf)\n",
-                                 adapter_id,
-                                 g_glob.event_dev_id );
-         FONT_NORMAL();
-#endif
-         print_rte_event_port_conf(1,"---create--- def_p_conf",adapter_id ,&g_glob.def_p_conf);
-         CALL_RTE("rte_event_eth_tx_adapter_create()");
-         ret = rte_event_eth_tx_adapter_create(adapter_id , 
-                                        g_glob.event_dev_id ,
-                                        &(g_glob.def_p_conf) );
-         if (ret)
-                rte_panic("Failed to create tx adapter[%d]\n",adapter_id);
-
-//       now add connections between eth dev and event dev
-         for( j = 0 ; j <  g_glob.tx_adptr.nb_tx_adptr_add; j++)
-         {
-            if(g_glob.tx_adptr.tx_adptr[i] == g_glob.tx_adptr.tx_adptr_add[j].adapter_id)
-            {
-// zzzzzzzzzzzzzzzzzzzzzzzzzzzz
-        
-#ifdef PRINT_CALL_ARGUMENTS
-                 FONT_CALL_ARGUMENTS_COLOR();
-                 printf(" int rte_event_eth_tx_adapter_queue_add( uint8_t  id,\n"
-                        "                                         uint16_t eth_dev_id,\n"
-                        "                                         int32_t  queue,\n"  /* this is the eth_queue */
-                        "                                        )\n");	
-                 printf(" Call Args: id:tx_adapter_id %d  eth_dev_id:port_id %d  tx_queue_id: %d \n",
-                                      g_glob.tx_adptr.tx_adptr_add[j].adapter_id, 
-                                      g_glob.tx_adptr.tx_adptr_add[j].eth_dev_port,
-                                      g_glob.tx_adptr.tx_adptr_add[j].eth_dev_queue);
-                 FONT_NORMAL();
-#endif
-                 CALL_RTE("rte_event_eth_tx_adapter_queue_add()");
-                 ret = rte_event_eth_tx_adapter_queue_add(  g_glob.tx_adptr.tx_adptr_add[j].adapter_id, 
-                                                            g_glob.tx_adptr.tx_adptr_add[j].eth_dev_port,
-                                                            g_glob.tx_adptr.tx_adptr_add[j].eth_dev_queue 
-                                                            );
-                 if (ret)
-                     rte_panic("Failed to add queues to Tx adapter\n");
-            }
-         }
-
-//       Start the tx adpater
-         CALL_RTE("rte_event_eth_tx_adapter_start(uint8_t id)");
-         ret = rte_event_eth_tx_adapter_start(adapter_id);
-         if (ret)
-              rte_panic("Tx adapter[%d] start Failed\n", adapter_id);
-
-    }  // loop next adapter
-
-}
-
-
+//////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////
+//  Setup for test_app
 
 int ethdev_setup( __attribute__((unused)) void * arg)
 {
@@ -889,9 +279,21 @@ int ethdev_setup( __attribute__((unused)) void * arg)
     WAI();
    print_eth_setup(); 
 
+///////
+/// Eth Dev Config info
+//////
 
     g_glob.enabled_eth_port_mask = 0x03 ;            // cmd line -p argument - here I hardwired :-0    
-    g_glob.nb_eth_ports_available = 0;               // calculated based on  g_glob.enabled_port_mask
+
+    
+
+
+
+
+///////
+/// Event Dev Config info
+//////
+
     g_glob.event_dev_id = 0;                         // event dev_id index/handle => SSO  0
 
     memset(&(g_glob.def_p_conf), 0, sizeof(struct rte_event_port_conf));  
@@ -1280,6 +682,663 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 
      return 0;
 }
+
+
+
+
+
+//  Each test function "init"  defines the number of ethernet devices
+//    this function displays all the interfaces DPDK sees and make sure
+//    the number of ethdev is consistent with what the "test function"
+//    expects.
+//   We expect the "INIT" functions have configuation information which
+//     is consistent with dpdk.
+void eth_dev_check_config(void);
+void eth_dev_check_config(void)
+{
+
+    int16_t  eth_port_id;
+    int16_t  nb_ports = 0;
+    char     string[64];
+    uint64_t i;
+
+    WAI();
+    g_glob.nb_eth_ports_available = 0;
+
+    printf("rte_eal_init() thinks I have the following ethdev device(s)\n");
+
+    // print eth port ids  that rte_init sees
+    RTE_ETH_FOREACH_DEV(eth_port_id) 
+    {
+        /* get (-ENODEV) or (-EINVAL) if port_id is invalid. */
+        if ( rte_eth_dev_get_name_by_port( eth_port_id , string) == 0)
+        {
+            printf("  ----> portid 0x%x enabled PCIe:  %s \n",eth_port_id,string );
+            nb_ports++;
+        }
+    }
+
+    // Now check what the program initialization wants for a port mask. 
+    for ( i = 0 ; i < (8*sizeof(uint16_t)) ; i++ )   // size of g_glob.enabled_port_mask
+    {
+       if ( (g_glob.enabled_eth_port_mask  & (0x01 << i))  != 0) 
+       { 
+          g_glob.nb_eth_ports_available++; 
+          printf(".");
+       }
+    }
+    printf("\n");
+    if( g_glob.nb_eth_ports_available  > nb_ports )
+    {
+         printf("ERR: rte_eth_dev %d    g_glob.nb_eth_ports_available=%d   \n",nb_ports,g_glob.nb_eth_ports_available);
+         rte_exit(EXIT_FAILURE, "Expected eth ports does not match available eth ports");
+    }
+    printf("  g_glob.enabled_eth_port_mask   (0x%04x)  \n"
+           "  g_glob.nb_eth_ports_available  %d \n"
+           "  nb_ports                       %d\n",
+                                            g_glob.enabled_eth_port_mask,
+                                            g_glob.nb_eth_ports_available,
+                                            nb_ports );
+}
+
+
+
+  
+
+
+// initialize each ethernet interface
+//      rte_eth_dev_info_get()             Get Default cfg from dpdk
+//      Adjust default config to what we need.
+//      rte_eth_dev_configure()            Create the interface - based on cfg
+//      rte_eth_dev_adjust_nb_rx_tx_desc() adjust the number of descriptors
+//      rte_eth_macaddr_get()              ---
+//      rte_eth_rx_queue_setup()           allowocate rx queues
+//      rte_eth_tx_queue_setup()           allocate tx Queues
+//      prte_eth_promiscuous_enable()      put interface in Promiscuous mode.
+void   initialize_eth_dev_ports(void)
+{         
+    uint16_t port_id;
+    int ret;
+    uint16_t nb_rxd = RTE_RX_DESC_DEFAULT;
+    uint16_t nb_txd = RTE_TX_DESC_DEFAULT;
+    uint32_t nb_mbufs;
+    uint16_t nb_ports = 0;
+
+    struct rte_eth_conf port_conf = {
+           .rxmode = {
+                  .max_rx_pkt_len = RTE_ETHER_MAX_LEN,
+                  .split_hdr_size = 0,
+           },
+           .txmode = {
+                   .mq_mode = ETH_MQ_TX_NONE,
+           },
+    };
+
+    WAI();
+    
+    // count the number of ports, and print out what rte_eal thinks we have. 
+    eth_dev_check_config();
+    nb_ports = g_glob.nb_eth_ports_available;
+
+
+// for event mode 
+// note the RSS reference    
+    port_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
+    port_conf.rx_adv_conf.rss_conf.rss_key = NULL;
+    port_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
+
+    print_rte_eth_conf(0,"default: port_conf",0,&port_conf);    
+
+//   allocate mbuffs for the eth-dev interface HW.
+//     first, how many ports, and confirm against eal_init
+
+
+    // allocate memory
+    nb_mbufs = RTE_MAX(nb_ports * (RTE_ETHDEV_RX_DESC_DEFAULT +
+                                   RTE_ETHDEV_TX_DESC_DEFAULT +
+                                   MAX_PKT_BURST + rte_lcore_count() *
+                                   MEMPOOL_CACHE_SIZE), 8192U);
+
+    printf(" We think we need  %d mbufs\n",nb_mbufs );
+    /* create the mbuf pool */
+
+   
+    CALL_RTE("rte_pktmbuf_pool_create()");    
+    g_glob.p_pktmbuf_pool = rte_pktmbuf_pool_create("mbuf_pool",
+
+                    nb_mbufs, MEMPOOL_CACHE_SIZE, 0,
+                    RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+    if (g_glob.p_pktmbuf_pool == NULL)
+            rte_panic("Cannot init mbuf pool (g_p_pktmbuf_pool)  \n");
+        
+
+///////////////////////////////////////
+///////////////////////////////////////
+    RTE_ETH_FOREACH_DEV(port_id) {
+         struct rte_eth_conf local_port_conf = port_conf;
+         struct rte_eth_dev_info dev_info;
+         struct rte_eth_rxconf rxq_conf;
+         struct rte_eth_txconf txq_conf;
+
+          /* skip ports that are not enabled */
+          if ((g_glob.enabled_eth_port_mask & (1 << port_id)) == 0) {
+                  printf("Skipping disabled port %u\n", port_id);
+                  continue;
+          }
+
+         /* init port */
+          printf("%sInitializing port %u... %s\n",C_RED, port_id,C_WHITE);
+          printf ("%s %s  portid: %d %s\n",C_RED,__FUNCTION__,port_id,C_WHITE);
+          fflush(stdout);
+
+#ifdef PRINT_CALL_ARGUMENTS
+               FONT_CALL_ARGUMENTS_COLOR();
+               printf(  " Call Args: port_id %d  dev_info: \n",port_id);
+               FONT_NORMAL();
+#endif
+          CALL_RTE("rte_eth_dev_info_get()");    
+          ret = rte_eth_dev_info_get(port_id, &dev_info);
+          if (ret != 0)
+                  rte_panic("Error during getting device (port %u) info: %s\n",
+                            port_id, strerror(-ret));
+
+// check for rss support on this eth port
+          local_port_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
+          if (local_port_conf.rx_adv_conf.rss_conf.rss_hf != port_conf.rx_adv_conf.rss_conf.rss_hf) {
+                  printf("Port %u modified RSS hash function based on hardware support,"
+                        "requested:%#"PRIx64" configured:%#"PRIx64"",
+                          port_id,
+                          port_conf.rx_adv_conf.rss_conf.rss_hf,
+                          local_port_conf.rx_adv_conf.rss_conf.rss_hf );
+          }
+
+          if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
+                  local_port_conf.txmode.offloads |=
+                          DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+ 
+#ifdef PRINT_CALL_ARGUMENTS
+          FONT_CALL_ARGUMENTS_COLOR();
+          printf(  " Call Args: port_id %d  rx_queuess:%d  tx_queues %d  local_port_conf: \n",port_id,1,1);
+          FONT_NORMAL();
+#endif
+          CALL_RTE("rte_eth_dev_configure()");    
+          ret = rte_eth_dev_configure(port_id, 1, 1, &local_port_conf);
+          if (ret < 0)
+                  rte_panic("Cannot configure device: err=%d, port=%u\n",
+                            ret, port_id);
+
+ #ifdef PRINT_CALL_ARGUMENTS
+          FONT_CALL_ARGUMENTS_COLOR();
+          printf(  " Call Args: port_id %d  nb_rxd :%d  nb_txd:%d \n",port_id,nb_rxd,nb_txd);
+          FONT_NORMAL();
+#endif
+          CALL_RTE("call rte_eth_dev_adjust_nb_rx_tx_desc()");    
+          ret = rte_eth_dev_adjust_nb_rx_tx_desc(port_id, &nb_rxd,
+                                                 &nb_txd);
+          if (ret < 0)
+                  rte_panic("Cannot adjust number of descriptors: err=%d, port=%u\n",
+                            ret, port_id);
+
+          CALL_RTE("call rte_eth_macaddr_get()");    
+          rte_eth_macaddr_get(port_id, &g_glob.eth_port_cfg_data[port_id].eth_addr);
+
+
+// FIX THIS LATER --  will need more than 1 queue on Rx and 1 queue on tx.
+
+          /*******************************************/ 
+          /****  init one RX queue on each port   ****/
+          /*******************************************/ 
+          fflush(stdout);
+          printf("port_id = %d\n",port_id);
+          printf("nb_rxd = %d\n",nb_rxd);
+          printf("rte_eth_dev_socket_id(port_id) = %d\n",rte_eth_dev_socket_id(port_id));
+          rxq_conf = dev_info.default_rxconf;
+          rxq_conf.offloads = local_port_conf.rxmode.offloads;
+
+#ifdef PRINT_CALL_ARGUMENTS
+          FONT_CALL_ARGUMENTS_COLOR();
+          printf(" int rte_eth_rx_queue_setup( uint16_t port_id, \n"
+                 "                             uint16_t rx_queue_id,\n"
+                 "                             uint16_t 	nb_rx_desc,\n"
+                 "                             unsigned int 	socket_id,\n"
+                 "                             const struct rte_eth_rxconf * 	rx_conf,\n"
+                 "                             struct rte_mempool * 	mb_pool \n"
+                 "                             )\n");
+          printf( " Call Args: port_id %d  rx_queue_id:%d  nb_rx_desc:%d  socketid:%d  rx_conf:   rte_mempool* \n",
+                                     port_id,           0,      nb_rxd,  rte_eth_dev_socket_id(port_id));
+          FONT_NORMAL();
+          print_rte_eth_rxconf( 0, &rxq_conf);
+#endif
+          CALL_RTE("rte_eth_rx_queue_setup()");    
+          ret = rte_eth_rx_queue_setup(port_id, 0, nb_rxd,
+                                       rte_eth_dev_socket_id(port_id),
+                                       &rxq_conf,
+                                       g_glob.p_pktmbuf_pool);
+          if (ret < 0)
+                  rte_panic("rte_eth_rx_queue_setup:err=%d, port=%u\n",
+                            ret, port_id);
+
+          /**********************************/ 
+          /* init one TX queue on each port */
+          /**********************************/ 
+          fflush(stdout);
+          txq_conf = dev_info.default_txconf;
+          txq_conf.offloads = local_port_conf.txmode.offloads;
+
+          print_rte_eth_txconf( 0, &txq_conf);
+          CALL_RTE("rte_eth_tx_queue_setup()");    
+          ret = rte_eth_tx_queue_setup(port_id, 0, nb_txd,
+                          rte_eth_dev_socket_id(port_id),
+                          &txq_conf);
+          if (ret < 0)
+                  rte_panic("rte_eth_tx_queue_setup:err=%d, port=%u\n",
+                            ret, port_id);
+
+          CALL_RTE("rte_eth_promiscuous_enable()\n");    
+          rte_eth_promiscuous_enable(port_id);
+
+          printf("Port %u,MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n\n",
+                  port_id,
+                  g_glob.eth_port_cfg_data[port_id].eth_addr.addr_bytes[0],
+                  g_glob.eth_port_cfg_data[port_id].eth_addr.addr_bytes[1],
+                  g_glob.eth_port_cfg_data[port_id].eth_addr.addr_bytes[2],
+                  g_glob.eth_port_cfg_data[port_id].eth_addr.addr_bytes[3],
+                  g_glob.eth_port_cfg_data[port_id].eth_addr.addr_bytes[4],
+                  g_glob.eth_port_cfg_data[port_id].eth_addr.addr_bytes[5]);
+
+    }  // FOR_EACH_ETHDEV
+
+}
+
+
+//////////////////////////////////////////////
+//////////////////////////////////////////////
+//  Start all the ethernet interfaces.
+void ethdev_start(void)
+{
+    uint16_t port_id;
+    int ret = 0;
+
+    RTE_ETH_FOREACH_DEV(port_id) {
+         /* skip ports that are not enabled */
+         if ((g_glob.enabled_eth_port_mask & (1 << port_id)) == 0)
+                         continue;
+
+
+
+#ifdef PRINT_CALL_ARGUMENTS
+    FONT_CALL_ARGUMENTS_COLOR();
+    printf(  " int rte_eth_dev_start( uint16_t port_id)\n");
+    printf(  " Call Args: port_id %d \n",port_id);
+    FONT_NORMAL();
+#endif
+    CALL_RTE("rte_eth_dev_start()");
+    ret = rte_eth_dev_start(port_id);
+    if (ret < 0)
+         rte_panic("rte_eth_dev_start:err=%d, port=%u\n", ret, port_id);
+    }
+
+}
+
+//////////////////////////////////////////////
+//////////////////////////////////////////////
+/* Check the link status of all ports in up to 9s, and print them finally */
+void check_ports_link_status(uint32_t port_mask)
+{
+#define CHECK_INTERVAL 100 /* 100ms */
+#define MAX_CHECK_TIME 90 /* 9s (90 * 100ms) in total */
+        uint16_t port_id;
+        uint8_t count, all_ports_up, print_flag = 0;
+        struct rte_eth_link link;
+        int ret;
+
+        WAI();
+        printf("\nChecking link status...");
+        fflush(stdout);
+        for (count = 0; count <= MAX_CHECK_TIME; count++) {
+                if (g_force_quit)
+                        return;
+                all_ports_up = 1;
+                RTE_ETH_FOREACH_DEV(port_id) {
+                        if (g_force_quit)
+                                return;
+                        if ((port_mask & (1 << port_id)) == 0)
+                                continue;
+                        memset(&link, 0, sizeof(link));
+                        ret = rte_eth_link_get_nowait(port_id, &link);
+                        if (ret < 0) {
+                                all_ports_up = 0;
+                                if (print_flag == 1)
+                                        printf("Port %u link get failed: %s\n",
+                                                port_id, rte_strerror(-ret));
+                                continue;
+                        }
+                        /* print link status if flag set */
+                        if (print_flag == 1) {
+                                if (link.link_status)
+                                        printf(
+                                        "Port%d Link Up. Speed %u Mbps - %s\n",
+                                                port_id, link.link_speed,
+                                (link.link_duplex == ETH_LINK_FULL_DUPLEX) ?
+                                        ("full-duplex") : ("half-duplex\n"));
+                                else
+                                        printf("Port %d Link Down\n", port_id);
+                                continue;
+                        }
+                        /* clear all_ports_up flag if any link down */
+                        if (link.link_status == ETH_LINK_DOWN) {
+                                all_ports_up = 0;
+                                break;
+                        }
+                }
+                /* after finally printing all link status, get out */
+                if (print_flag == 1)
+                        break;
+
+                if (all_ports_up == 0) {
+                        printf(".");
+                        fflush(stdout);
+                        rte_delay_ms(CHECK_INTERVAL);
+                }
+
+                /* set the print_flag if all ports up or timeout */
+                if (all_ports_up == 1 || count == (MAX_CHECK_TIME - 1)) {
+                        print_flag = 1;
+                        printf("done\n");
+                }
+        }
+}
+
+
+
+
+#define MAX_STRING_LEN 256
+
+/* show border */
+static char bdr_str[MAX_STRING_LEN];
+
+#define STATS_BDR_FMT "========================================"
+#define STATS_BDR_STR(w, s) printf("%.*s%s%.*s\n", w, \
+        STATS_BDR_FMT, s, w, STATS_BDR_FMT)
+  
+
+
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+// show_port
+void show_port(void)
+{
+        uint16_t i = 0;
+        int ret = 0, j, k;
+
+        snprintf(bdr_str, MAX_STRING_LEN, " show - Port PMD %"PRIu64,
+                        rte_get_tsc_hz());
+        STATS_BDR_STR(10, bdr_str);
+
+        RTE_ETH_FOREACH_DEV(i) {
+                uint16_t mtu = 0;
+                struct rte_eth_link link;
+                struct rte_eth_dev_info dev_info;
+                struct rte_eth_rxq_info queue_info;
+                struct rte_eth_rss_conf rss_conf;
+
+                memset(&rss_conf, 0, sizeof(rss_conf));
+
+                snprintf(bdr_str, MAX_STRING_LEN, " Port (%u)", i);
+
+                printf("\t  -- Socket %d\n", rte_eth_dev_socket_id(i));
+                ret = rte_eth_link_get(i, &link);
+                if (ret < 0) {
+                        printf("Link get failed (port %u): %s\n",
+                               i, rte_strerror(-ret));
+                } else {
+                        printf("\t  -- link speed %d duplex %d,"
+                                        " auto neg %d status %d\n",
+                                        link.link_speed,
+                                        link.link_duplex,
+                                        link.link_autoneg,
+                                        link.link_status);
+                }
+                printf("\t  -- promiscuous (%d)\n",
+                                rte_eth_promiscuous_get(i));
+                ret = rte_eth_dev_get_mtu(i, &mtu);
+                if (ret == 0)
+                        printf("\t  -- mtu (%d)\n", mtu);
+
+                ret = rte_eth_dev_info_get(i, &dev_info);
+                if (ret != 0) {
+                        printf("Error during getting device (port %u) info: %s\n",
+                                i, strerror(-ret));
+                        return;
+                }
+
+                printf("  - queue\n");
+                for (j = 0; j < dev_info.nb_rx_queues; j++) {
+                        ret = rte_eth_rx_queue_info_get(i, j, &queue_info);
+                        if (ret == 0) {
+                                printf("\t  -- queue %d rx scatter %d"
+                                                " descriptors %d"
+                                                " offloads 0x%"PRIx64
+                                                " mempool socket %d\n",
+                                                j,
+                                                queue_info.scattered_rx,
+                                                queue_info.nb_desc,
+                                                queue_info.conf.offloads,
+                                                queue_info.mp->socket_id);
+                        }
+                }
+
+                ret = rte_eth_dev_rss_hash_conf_get(i, &rss_conf);
+                if (ret == 0) {
+                        if (rss_conf.rss_key) {
+                                printf("  - RSS\n");
+                                printf("\t  -- RSS len %u key (hex):",
+                                                rss_conf.rss_key_len);
+                                for (k = 0; k < rss_conf.rss_key_len; k++)
+                                        printf(" %x", rss_conf.rss_key[k]);
+                                printf("\t  -- hf 0x%"PRIx64"\n",
+                                                rss_conf.rss_hf);
+                        }
+                }
+
+                printf("  - cyrpto context\n");
+#ifdef RTE_LIBRTE_SECURITY
+                void *p_ctx = rte_eth_dev_get_sec_ctx(i);
+                printf("\t  -- security context - %p\n", p_ctx);
+
+                if (p_ctx) {
+                        printf("\t  -- size %u\n",
+                                        rte_security_session_get_size(p_ctx));
+                        const struct rte_security_capability *s_cap =
+                                rte_security_capabilities_get(p_ctx);
+                        if (s_cap) {
+                                printf("\t  -- action (0x%x), protocol (0x%x),"
+                                                " offload flags (0x%x)\n",
+                                                s_cap->action,
+                                                s_cap->protocol,
+                                                s_cap->ol_flags);
+//                                printf("\t  -- capabilities - oper type %x\n",
+//                                                s_cap->crypto_capabilities->op);
+                        }
+                }
+#endif
+        }
+
+        STATS_BDR_STR(50, "");
+}
+
+
+
+
+
+
+
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
+//  Connect  interface rx/tx queues (ethdev)  to event-dev queues
+//
+//  malloc()                           -allocates memory to save an index to each rx_adapter
+//  rte_event_eth_rx_adapter_create()  -create the adapter 
+
+void  rx_tx_adapter_setup_internal_port(void)
+{
+    struct   rte_event_eth_rx_adapter_queue_conf eth_q_conf;
+    uint16_t adapter_id = 0;
+    int      ret;
+    int      i,j;
+
+    WAI();
+
+//////////////////////////////////////////////
+/////////// configure rx adapters ////////////
+////////////////////////////////////////////// 
+
+     memset(&eth_q_conf, 0, sizeof(eth_q_conf));
+
+//  walk through the aray of adapter Indexes
+   for ( i = 0 ; i < g_glob.rx_adptr.nb_rx_adptr ; i++ )
+   {
+
+//       Create the adpater
+         adapter_id = g_glob.rx_adptr.rx_adptr[i]; 
+#ifdef PRINT_CALL_ARGUMENTS
+         FONT_CALL_ARGUMENTS_COLOR();
+         printf("int rte_event_eth_rx_adapter_create( uint8_t   id,\n"
+                "                                     uint8_t 	dev_id,\n"
+                "                                     struct rte_event_port_conf * port_config\n" 
+                "                                     )\n");	
+         printf(  " Call Args: adapter_id %d  event_dev_id %d  rte_event_port_conf: \n",
+                                                               adapter_id,
+                                                               g_glob.event_dev_id);
+         FONT_NORMAL();
+#endif
+
+         print_rte_event_port_conf(1,"---create--- def_p_conf",adapter_id,&g_glob.def_p_conf);
+         CALL_RTE("rte_event_eth_rx_adapter_create()");
+         ret = rte_event_eth_rx_adapter_create(adapter_id,
+                                                g_glob.event_dev_id,
+                                                &g_glob.def_p_conf);
+         if (ret)
+               rte_panic("Failed to create rx adapter[%d]\n", adapter_id);
+
+//       now add connections between eth dev and event dev
+         for( j = 0 ; j <  g_glob.rx_adptr.nb_rx_adptr_add; j++)
+         {
+            if(g_glob.rx_adptr.rx_adptr[i] == g_glob.rx_adptr.rx_adptr_add[j].adapter_id)
+            {
+         /* Configure user requested sched type*/
+                 eth_q_conf.ev.event_type     = RTE_EVENT_TYPE_ETHDEV  ;        // uint32_t event_type:4;
+                 eth_q_conf.ev.sub_event_type = RTE_EVENT_TYPE_ETH_RX_ADAPTER ; // uint32_t sub_event_type:8;
+                 eth_q_conf.ev.sched_type     = g_glob.rx_adptr.rx_adptr_add[j].sched_type ;     // handle incomming traffic as ordered
+                 eth_q_conf.ev.op             = RTE_EVENT_OP_NEW;                                // uint8_t op:2; NEW,FORWARD or RELEASE  Really Create a flow, reuse a flow, delete a few.
+                 eth_q_conf.ev.priority       = g_glob.rx_adptr.rx_adptr_add[j].priority;        //  0x80 - set priority above eth traffic (0x80) 
+                 eth_q_conf.ev.queue_id       = g_glob.rx_adptr.rx_adptr_add[j].event_dev_queue; //  the event queue the WQE will be put in
+        
+#ifdef PRINT_CALL_ARGUMENTS
+                 FONT_CALL_ARGUMENTS_COLOR();
+                 printf(" int rte_event_eth_rx_adapter_queue_add( uint8_t  id,\n"
+                        "                                         uint16_t eth_dev_id,\n"
+                        "                                         int32_t 	rx_queue_id,\n"
+                        "                                         const struct rte_event_eth_rx_adapter_queue_conf * 	conf\n" 
+                        "                                        )\n");	
+                 printf(" Call Args: id:rx_adapter_id %d  eth_dev_id:port_id %d  rx_queue_id: %d struct rte_event_eth_rx_adapter_queue_conf:\n",
+                                      g_glob.rx_adptr.rx_adptr_add[j].adapter_id, 
+                                      g_glob.rx_adptr.rx_adptr_add[j].eth_dev_port,
+                                      g_glob.rx_adptr.rx_adptr_add[j].eth_dev_queue);
+                 FONT_NORMAL();
+#endif
+                 print_rte_event_eth_rx_adapter_queue_conf(1,"--add-- eth_q_conf",
+                                                    g_glob.rx_adptr.rx_adptr_add[j].adapter_id,
+                                                    &eth_q_conf);
+                 CALL_RTE("rte_event_eth_rx_adapter_queue_add()");
+                 ret = rte_event_eth_rx_adapter_queue_add(  g_glob.rx_adptr.rx_adptr_add[j].adapter_id, 
+                                                            g_glob.rx_adptr.rx_adptr_add[j].eth_dev_port,
+                                                            g_glob.rx_adptr.rx_adptr_add[j].eth_dev_queue, 
+                                                            &eth_q_conf);
+         if (ret)
+              rte_panic("Failed to add queues to Rx adapter\n");
+
+            }
+         }
+
+//       Start the adpater
+         CALL_RTE("rte_event_eth_rx_adapter_start(uint8_t id)");
+         ret = rte_event_eth_rx_adapter_start(adapter_id);
+         if (ret)
+              rte_panic("Rx adapter[%d] start Failed\n", adapter_id);
+
+    }  // loop next adapter
+
+
+//////////////////////////////////////////////
+/////////// configure tx adapters ////////////
+////////////////////////////////////////////// 
+ 
+//  walk through the aray of adapter Indexes
+   for ( i = 0 ; i < g_glob.tx_adptr.nb_tx_adptr ; i++ )
+   {
+//       Create the adpater
+         adapter_id = g_glob.tx_adptr.tx_adptr[i]; 
+
+#ifdef PRINT_CALL_ARGUMENTS
+         FONT_CALL_ARGUMENTS_COLOR();
+         printf("int rte_event_eth_tx_adapter_create( uint8_t id, \n"
+                "                                     uint8_t dev_id,\n"
+                "                                     struct rte_event_port_conf * 	port_config \n"
+                "                                     )\n");	
+         printf(" Call Args: adpater_id: %d, event_dev_id:%d, struct def_p_conf)\n",
+                                 adapter_id,
+                                 g_glob.event_dev_id );
+         FONT_NORMAL();
+#endif
+         print_rte_event_port_conf(1,"---create--- def_p_conf",adapter_id ,&g_glob.def_p_conf);
+         CALL_RTE("rte_event_eth_tx_adapter_create()");
+         ret = rte_event_eth_tx_adapter_create(adapter_id , 
+                                        g_glob.event_dev_id ,
+                                        &(g_glob.def_p_conf) );
+         if (ret)
+                rte_panic("Failed to create tx adapter[%d]\n",adapter_id);
+
+//       now add connections between eth dev and event dev
+         for( j = 0 ; j <  g_glob.tx_adptr.nb_tx_adptr_add; j++)
+         {
+            if(g_glob.tx_adptr.tx_adptr[i] == g_glob.tx_adptr.tx_adptr_add[j].adapter_id)
+            {
+// zzzzzzzzzzzzzzzzzzzzzzzzzzzz
+        
+#ifdef PRINT_CALL_ARGUMENTS
+                 FONT_CALL_ARGUMENTS_COLOR();
+                 printf(" int rte_event_eth_tx_adapter_queue_add( uint8_t  id,\n"
+                        "                                         uint16_t eth_dev_id,\n"
+                        "                                         int32_t  queue,\n"  /* this is the eth_queue */
+                        "                                        )\n");	
+                 printf(" Call Args: id:tx_adapter_id %d  eth_dev_id:port_id %d  tx_queue_id: %d \n",
+                                      g_glob.tx_adptr.tx_adptr_add[j].adapter_id, 
+                                      g_glob.tx_adptr.tx_adptr_add[j].eth_dev_port,
+                                      g_glob.tx_adptr.tx_adptr_add[j].eth_dev_queue);
+                 FONT_NORMAL();
+#endif
+                 CALL_RTE("rte_event_eth_tx_adapter_queue_add()");
+                 ret = rte_event_eth_tx_adapter_queue_add(  g_glob.tx_adptr.tx_adptr_add[j].adapter_id, 
+                                                            g_glob.tx_adptr.tx_adptr_add[j].eth_dev_port,
+                                                            g_glob.tx_adptr.tx_adptr_add[j].eth_dev_queue 
+                                                            );
+                 if (ret)
+                     rte_panic("Failed to add queues to Tx adapter\n");
+            }
+         }
+
+//       Start the tx adpater
+         CALL_RTE("rte_event_eth_tx_adapter_start(uint8_t id)");
+         ret = rte_event_eth_tx_adapter_start(adapter_id);
+         if (ret)
+              rte_panic("Tx adapter[%d] start Failed\n", adapter_id);
+
+    }  // loop next adapter
+
+}
+
+
 
 
 

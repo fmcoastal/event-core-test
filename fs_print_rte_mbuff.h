@@ -15,7 +15,7 @@ char * format_LE_ip_addr(char * str,uint32_t ip);
 /*
  *   converts a ethernet address into a printable String
  */
-char * rte_format_mac_addr(char * str,struct rte_ether_addr *m );
+char * format_rte_mac_addr(char * str,struct rte_ether_addr *m );
 
 
 

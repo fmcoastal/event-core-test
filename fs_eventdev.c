@@ -1,6 +1,7 @@
 #include <stdint.h>
-#include <stdint.h>
-
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 
 
 #include <rte_config.h>
@@ -12,6 +13,9 @@
 
 
 #include "fs_extras.h"
+#include "main.h"
+#include "fs_net_common.h"
+#include "fs_ethdev.h"
 #include "fs_eventdev.h"
 #include "fs_global_vars.h"
 

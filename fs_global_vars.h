@@ -6,10 +6,11 @@
 
 //////////////////////////////////////
 typedef struct global_data_struct {
-   uint16_t  enabled_eth_port_mask   ;   //two ports handled by vfio-pci
-   uint16_t  nb_eth_ports_available  ;
-   struct    rte_ether_addr  eth_addr[RTE_MAX_ETHPORTS];
-   uint16_t  event_dev_id;             // event dev device ID index.
+   uint16_t                      enabled_eth_port_mask   ; //two ports handled by vfio-pci
+   uint16_t                      nb_eth_ports_available  ;
+//   struct    rte_ether_addr      eth_addr[RTE_MAX_ETHPORTS];
+   struct    eth_port_conf       eth_port_cfg_data[RTE_MAX_ETHPORTS];
+   uint16_t                      event_dev_id            ; // event dev device ID index.
    struct    rte_mempool*        p_pktmbuf_pool ;
    struct    event_queues        evq;
    struct    event_ports         evp;
