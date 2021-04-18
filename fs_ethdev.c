@@ -206,69 +206,6 @@ int      ethdev_cleanup( __attribute__((unused))void * arg);
 void ethdev_description( void);
 
 
-#ifdef MOVED_TO_FS_EVENTDEV_H
-struct event_rx_adptr {
-        uint32_t service_id;
-        uint8_t nb_rx_adptr;
-        uint8_t *rx_adptr;
-};
-
-struct event_tx_adptr {
-        uint32_t service_id;
-        uint8_t nb_tx_adptr;
-        uint8_t *tx_adptr;
-};
-
-////////////////////////////////////
-
-typedef struct  event_queue_cfg_struct {
-     int                           event_q_id;
-     int                           to_event_port;
-     struct rte_event_queue_conf   ev_q_conf ;
-   } event_queue_cfg_t;
-
-struct event_queues {
-        event_queue_cfg_t *event_q_cfg;
-        uint8_t            nb_queues;
-};
-
-////////////////////////////////////
-typedef struct event_port_link_struct
-       {
-          uint8_t nb_links;
-          uint8_t q_id[32];
-          uint8_t pri[32];
-       } q_id_and_priority_t;
-
-struct event_ports {
-        q_id_and_priority_t  *event_p_id;
-        uint8_t            nb_ports;
-        rte_spinlock_t    lock;
-};
-
-
-//////////////////////////////////////
-typedef struct global_data_struct {
-   uint16_t  enabled_eth_port_mask   ;   //two ports handled by vfio-pci  
-   uint16_t  nb_eth_ports_available  ;
-   uint16_t  event_dev_id;             // event dev device ID index.
-   struct rte_mempool*        p_pktmbuf_pool ;
-   struct rte_ether_addr      eth_addr[RTE_MAX_ETHPORTS]; 
-   struct rte_event_port_conf def_p_conf;
-   struct event_rx_adptr      rx_adptr;
-   struct event_tx_adptr      tx_adptr;
-   struct event_queues        evq;
-   struct event_ports         evp;
-   struct rte_event_timer_adapter *timer_100ms;
-} global_data_t;  
-
-
-global_data_t g_glob ={0};
-
-void print_global_data(global_data_t *p);
-
-#endif
-
 //////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////
 //  Setup for test_app
@@ -285,8 +222,12 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 
     g_glob.enabled_eth_port_mask = 0x03 ;            // cmd line -p argument - here I hardwired :-0    
 
-    
-
+   // number of rx and tx ports per queue
+   // g_glob.eth_port_conf[port_id].nb_rx_queues=1 ;
+    g_glob.eth_port_cfg_data[0].nb_rx_queues=1 ;    
+    g_glob.eth_port_cfg_data[0].nb_tx_queues=1 ;   
+    g_glob.eth_port_cfg_data[1].nb_rx_queues=1 ;    
+    g_glob.eth_port_cfg_data[1].nb_tx_queues=1 ;   
 
 
 
@@ -733,12 +674,33 @@ void eth_dev_check_config(void)
          printf("ERR: rte_eth_dev %d    g_glob.nb_eth_ports_available=%d   \n",nb_ports,g_glob.nb_eth_ports_available);
          rte_exit(EXIT_FAILURE, "Expected eth ports does not match available eth ports");
     }
+
+
+
     printf("  g_glob.enabled_eth_port_mask   (0x%04x)  \n"
            "  g_glob.nb_eth_ports_available  %d \n"
            "  nb_ports                       %d\n",
                                             g_glob.enabled_eth_port_mask,
                                             g_glob.nb_eth_ports_available,
                                             nb_ports );
+
+    printf("  port_id    PCIe address    nb_rx_queues    nb_tx_queues\n ");
+   // check that the Number of Rx and Tx queues are greater than 0. (missed in initialization??)
+   for( i = 0 ; i <  g_glob.nb_eth_ports_available ; i++)
+   {
+       rte_eth_dev_get_name_by_port( eth_port_id , string);
+       printf("  %ld      %s   %d     %d \n ", i, string, 
+                                          g_glob.eth_port_cfg_data[0].nb_rx_queues,
+                                          g_glob.eth_port_cfg_data[0].nb_tx_queues );
+       if ( ( g_glob.eth_port_cfg_data[0].nb_rx_queues == 0 ) ||
+            ( g_glob.eth_port_cfg_data[0].nb_rx_queues == 0 ))
+       {
+                printf(" -- ERROR - Eth port defined with qty 0 rx or tx queues \n ");
+               rte_exit(EXIT_FAILURE, "Eth port %ld defined with qty 0 rx or tx queues \n",i);
+       }
+   }
+
+
 }
 
 
@@ -858,11 +820,17 @@ void   initialize_eth_dev_ports(void)
  
 #ifdef PRINT_CALL_ARGUMENTS
           FONT_CALL_ARGUMENTS_COLOR();
-          printf(  " Call Args: port_id %d  rx_queuess:%d  tx_queues %d  local_port_conf: \n",port_id,1,1);
+          printf(  " Call Args: port_id %d  rx_queuess:%d  tx_queues %d  local_port_conf: \n",
+                                port_id,
+                                 g_glob.eth_port_cfg_data[port_id].nb_rx_queues,
+                                 g_glob.eth_port_cfg_data[port_id].nb_tx_queues);
           FONT_NORMAL();
 #endif
           CALL_RTE("rte_eth_dev_configure()");    
-          ret = rte_eth_dev_configure(port_id, 1, 1, &local_port_conf);
+          ret = rte_eth_dev_configure(port_id, 
+                                      g_glob.eth_port_cfg_data[port_id].nb_rx_queues, 
+                                      g_glob.eth_port_cfg_data[port_id].nb_tx_queues, 
+                                      &local_port_conf);
           if (ret < 0)
                   rte_panic("Cannot configure device: err=%d, port=%u\n",
                             ret, port_id);

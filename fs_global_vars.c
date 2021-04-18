@@ -71,7 +71,7 @@ int i,j;
    printf("\n");
    printf("------------ eth_dev config data  -----------\n");
    {
-      printf(" struct rte_eth_conf eth_port_cfg_data[RTE_MAX_ETHPORTS];");
+      printf(" struct rte_eth_conf eth_port_cfg_data[RTE_MAX_ETHPORTS];\n");
       for ( i = 0 ; i < p->nb_eth_ports_available ; i++)
       {
          rte_eth_dev_get_name_by_port( i , string);

@@ -234,7 +234,21 @@ int timer_setup( __attribute__((unused)) void * arg)
     WAI();
     timer_print_setup();
 
+///////
+/// Eth Dev Config info
+//////
     g_glob.enabled_eth_port_mask = 0x03 ;            // cmd line -p argument - here I hardwired :-0    
+
+   // number of rx and tx ports per queue
+   // g_glob.eth_port_conf[port_id].nb_rx_queues=1 ;
+    g_glob.eth_port_cfg_data[0].nb_rx_queues=1 ;
+    g_glob.eth_port_cfg_data[0].nb_tx_queues=1 ;
+    g_glob.eth_port_cfg_data[1].nb_rx_queues=1 ;
+    g_glob.eth_port_cfg_data[1].nb_tx_queues=1 ;
+
+///////
+/// Event Dev Config info
+//////
     g_glob.event_dev_id = 0;                         // event dev_id index/handle => SSO  0
 
     memset(&(g_glob.def_p_conf), 0, sizeof(struct rte_event_port_conf));  
