@@ -221,12 +221,17 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 
     g_glob.enabled_eth_port_mask = 0x03 ;            // cmd line -p argument - here I hardwired :-0    
 
-   // number of rx and tx ports per queue
+   // number of rx and tx eth queues per eth_port
    // g_glob.eth_port_conf[port_id].nb_rx_queues=1 ;
     g_glob.eth_port_cfg_data[0].nb_rx_queues=1 ;    
     g_glob.eth_port_cfg_data[0].nb_tx_queues=1 ;   
+
     g_glob.eth_port_cfg_data[1].nb_rx_queues=1 ;    
     g_glob.eth_port_cfg_data[1].nb_tx_queues=1 ;   
+
+//  set up filters here
+  //  -none - above mapping is set up as 1:1 mapping
+
 
 
 
@@ -687,12 +692,12 @@ void eth_dev_check_config(void)
    // check that the Number of Rx and Tx queues are greater than 0. (missed in initialization??)
    for( i = 0 ; i <  g_glob.nb_eth_ports_available ; i++)
    {
-       rte_eth_dev_get_name_by_port( eth_port_id , string);
-       printf("  %ld      %s   %d     %d \n ", i, string, 
-                                          g_glob.eth_port_cfg_data[0].nb_rx_queues,
-                                          g_glob.eth_port_cfg_data[0].nb_tx_queues );
-       if ( ( g_glob.eth_port_cfg_data[0].nb_rx_queues == 0 ) ||
-            ( g_glob.eth_port_cfg_data[0].nb_rx_queues == 0 ))
+       rte_eth_dev_get_name_by_port( i , string);
+       printf("  %ld         %s         %d            %d \n ", i, string, 
+                                          g_glob.eth_port_cfg_data[i].nb_rx_queues,
+                                          g_glob.eth_port_cfg_data[i].nb_tx_queues );
+       if ( ( g_glob.eth_port_cfg_data[i].nb_rx_queues == 0 ) ||
+            ( g_glob.eth_port_cfg_data[i].nb_rx_queues == 0 ))
        {
                 printf(" -- ERROR - Eth port defined with qty 0 rx or tx queues \n ");
                rte_exit(EXIT_FAILURE, "Eth port %ld defined with qty 0 rx or tx queues \n",i);

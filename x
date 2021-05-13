@@ -65,7 +65,7 @@ elif  [ "$RUN_CODE" == "8" ] ; then
 elif  [ "$RUN_CODE" == "7" ] ; then
 
 
-./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:04:00.0 -w 0002:05:00.0   –log-level=’pmd.crypto.octeontx2,8’  -- -t 7 -v 0xffff -p 1000
+./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:04:00.0 -w 0002:05:00.0   –log-level=’pmd.octeontx2.base,8’  -- -t 7 -v 0xffff -p 1000
 # ./build/core_test_app -c 0xf00000 -w 0002:0e:00.0,xae_cnt=32768  -w 0002:10:00.1  -w 0002:04:00.0 -w 0002:05:00.0   –log-level=’pmd.crypto.octeontx2,8’  -- -t 7 -m  -p 1
 
 ########################################################################################################
