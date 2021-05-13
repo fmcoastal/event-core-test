@@ -2,6 +2,15 @@
 #define _fs_global_data_h
 
 
+struct core_stats {
+    uint64_t rx_event_cnt;
+    uint64_t rx_packet_cnt;
+}  __rte_cache_aligned;
+
+extern struct core_stats g_core_stats[];
+
+void print_g_core_stats(void);
+
 
 
 //////////////////////////////////////

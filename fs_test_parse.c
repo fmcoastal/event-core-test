@@ -473,7 +473,7 @@ int test_setup( __attribute__((unused)) void * arg)
 /////  Configer event_timer  hw.   
 /////
 /////
-//#define TIMER_ADAPTER
+#define TIMER_ADAPTER
 #ifdef TIMER_ADAPTER
       timer_event_init();
       timer_event_start();
@@ -561,6 +561,36 @@ int test_loop( __attribute__((unused)) void * arg)
 
     if(  lcore_id == 23 )  
     {
+ #ifdef TIMER_ADAPTER
+         // Set up timer event structure to send a timerout via eventdev to a core
+
+         p_ev_timer = &g_ev_timer;
+
+         p_ev_timer = gen_timer_ev( p_ev_timer,                 /* struct rte_event_timer *   */
+                                     0x07734 ,                  /* uint32_t flow_id           */
+                                     RTE_SCHED_TYPE_PARALLEL,   /* uint8_t  sched_type        */
+                                     1,                         /* uint8_t  evt_queue         */
+                                     0x40,                      /* uint8_t evt_queue_priority */
+                                     (void *)p_ev_timer );      /* void * evt_ptr */
+
+   #ifdef PRINT_CALL_ARGUMENTS
+         FONT_CALL_ARGUMENTS_COLOR();
+         printf(" Call Args: event_dev_id:%d, lcore_id:%d ev: \n",event_dev_id,lcore_id);
+         FONT_NORMAL();
+   #endif
+         print_rte_event_timer ( 1, "g_ev_timer",&(g_ev_timer));
+         CALL_RTE("rte_event_timer_arm_burst() ");
+         ret = rte_event_timer_arm_burst( g_glob.timer_100ms , &p_ev_timer, 1 );
+         if( ret != 1 )
+         {
+              printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
+              printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
+              rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
+         }
+
+#endif  // event timer
+
+
           
 
     }
@@ -639,6 +669,7 @@ int test_loop( __attribute__((unused)) void * arg)
         {
             VERBOSE_M( EVENT_MESSAGES ) printf("%s Received Event: 0x%02x  (events[i].event_type) %s\n",C_BLUE,events[i].event_type,     C_NORMAL );
             VERBOSE_M( EVENT_DETAILS )  print_rte_event(0,"RTE_EVENT: ",&events[i] );
+            g_core_stats[lcore_id].rx_event_cnt++ ; // inc stats
 //////$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ////// switch through the event types
 //////$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -656,6 +687,33 @@ int test_loop( __attribute__((unused)) void * arg)
 //$$$$$$$$  Event type - TIMER
 //$$$$$$$$
                 case RTE_EVENT_TYPE_TIMER:
+#ifdef TIMER_ADAPTER
+                 printf("****    c%d) Received %d Timer events from evt_port_id %d**** \n",lcore_id,nb_rx,event_port_     id);
+
+                 print_g_core_stats();
+
+                 p_ev_timer = events[i].event_ptr;
+                 // set to forward to next core.
+                 p_ev_timer->state          = RTE_EVENT_TIMER_NOT_ARMED;
+                 // send timer event to same core.
+                 p_ev_timer->ev.queue_id    = 1;                  // TIMER_EVENT_QUEUE ;
+                 // set operation to forward packet
+                 //  p_ev_timer->ev.op             = RTE_EVENT_OP_FORWARD;
+                 p_ev_timer->ev.flow_id        += 1;
+
+                 ret= rte_event_timer_arm_burst( g_glob.timer_100ms , &p_ev_timer, 1 );
+
+                 if( ret != 1 )
+                 {
+                      printf("ERR: rte_event_enqueue_burst returned %d \n",ret);
+                      printf("    errno:%d  %s\n",rte_errno,rte_strerror(rte_errno));
+                      rte_exit(EXIT_FAILURE, "Error failed to enqueue startup event");
+                 }
+#endif
+
+
+
+
                      break;
 //$$$$$$$$
 //$$$$$$$$  Event type - ETHDEV
@@ -669,7 +727,7 @@ int test_loop( __attribute__((unused)) void * arg)
                          MAC_Hdr_t          l2_hdr;   // MAC_HDR_T is not memory aligned to an l2 header.
                                                       //   the structure has header size and saves vlans
                                                       //   if it find them in the header.
-                         g_rx_packet_cnt[lcore_id]++; // increment stats
+                         g_core_stats[lcore_id].rx_packet_cnt++ ; // increment stats
                          core_counter--;
               ////////////////////
               // Print Packet Info
@@ -694,7 +752,7 @@ int test_loop( __attribute__((unused)) void * arg)
                              }
                              VERBOSE_M( EVENT_ETH_MESSAGES)
                              {
-                                 printf(" rx_pkt_cnt: %lu \n",g_rx_packet_cnt[lcore_id]);
+                                 printf(" rx_pkt_cnt: %lu \n",g_core_stats[lcore_id].rx_packet_cnt);
                              }
                          }  // end print packet info
                ////////////////////////

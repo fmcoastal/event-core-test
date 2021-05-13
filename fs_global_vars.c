@@ -55,6 +55,12 @@
 
 global_data_t g_glob={0};
 
+// global Core stats
+struct core_stats g_core_stats[RTE_MAX_LCORE] = {0};
+
+
+
+
 
 
 void print_global_data (global_data_t *p)
@@ -235,9 +241,26 @@ int i,j;
 
 }
 
+uint64_t g_core_statss_tick=0;
 
 
+void print_g_core_stats(void)
+{
+    unsigned int i;
 
+    printf("===========================================================\n");
+    printf("Core                Event    \n");
+    printf("index     CORE      count     rx_pkt_cnt    Tick=%ld\n", g_core_statss_tick++); 
+    for ( i = 0 ; i < RTE_MAX_LCORE ; i++)
+    {   
+         if ( rte_lcore_is_enabled(i) )
+         printf(" %2d        %2d        %ld          %ld \n",rte_lcore_index(i),i, 
+
+
+                               g_core_stats[i].rx_event_cnt,
+                               g_core_stats[i].rx_packet_cnt    );
+    }
+}
 
 
 

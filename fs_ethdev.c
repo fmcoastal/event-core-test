@@ -74,7 +74,6 @@
 extern uint64_t  g_core_messages;
 extern int64_t g_print_interval;
 
-uint64_t  g_rx_packet_cnt[32] = {0};
 
 extern int g_drop_all_traffic ;
 uint32_t  g_IP_eth0 =  0xc0a80364 ;    // 192.168.3.100
@@ -714,7 +713,7 @@ void eth_dev_check_config(void)
 //      rte_eth_dev_configure()            Create the interface - based on cfg
 //      rte_eth_dev_adjust_nb_rx_tx_desc() adjust the number of descriptors
 //      rte_eth_macaddr_get()              ---
-//      rte_eth_rx_queue_setup()           allowocate rx queues
+//      rte_eth_rx_queue_setup()           allocate rx queues
 //      rte_eth_tx_queue_setup()           allocate tx Queues
 //      prte_eth_promiscuous_enable()      put interface in Promiscuous mode.
 void   initialize_eth_dev_ports(void)
@@ -725,6 +724,7 @@ void   initialize_eth_dev_ports(void)
     uint16_t nb_txd = RTE_TX_DESC_DEFAULT;
     uint32_t nb_mbufs;
     uint16_t nb_ports = 0;
+    int      i;
 
     struct rte_eth_conf port_conf = {
            .rxmode = {
@@ -852,7 +852,7 @@ void   initialize_eth_dev_ports(void)
 
 
 // FIX THIS LATER --  will need more than 1 queue on Rx and 1 queue on tx.
-
+// Fixed??
           /*******************************************/ 
           /****  init one RX queue on each port   ****/
           /*******************************************/ 
@@ -863,28 +863,31 @@ void   initialize_eth_dev_ports(void)
           rxq_conf = dev_info.default_rxconf;
           rxq_conf.offloads = local_port_conf.rxmode.offloads;
 
+          for( i = 0 ; i < g_glob.eth_port_cfg_data[port_id].nb_rx_queues ; i++)
+          {
 #ifdef PRINT_CALL_ARGUMENTS
-          FONT_CALL_ARGUMENTS_COLOR();
-          printf(" int rte_eth_rx_queue_setup( uint16_t port_id, \n"
-                 "                             uint16_t rx_queue_id,\n"
-                 "                             uint16_t 	nb_rx_desc,\n"
-                 "                             unsigned int 	socket_id,\n"
-                 "                             const struct rte_eth_rxconf * 	rx_conf,\n"
-                 "                             struct rte_mempool * 	mb_pool \n"
-                 "                             )\n");
-          printf( " Call Args: port_id %d  rx_queue_id:%d  nb_rx_desc:%d  socketid:%d  rx_conf:   rte_mempool* \n",
-                                     port_id,           0,      nb_rxd,  rte_eth_dev_socket_id(port_id));
-          FONT_NORMAL();
-          print_rte_eth_rxconf( 0, &rxq_conf);
+              FONT_CALL_ARGUMENTS_COLOR();
+              printf(" int rte_eth_rx_queue_setup( uint16_t port_id, \n"
+                     "                             uint16_t rx_queue_id,\n"
+                     "                             uint16_t 	nb_rx_desc,\n"
+                     "                             unsigned int 	socket_id,\n"
+                     "                             const struct rte_eth_rxconf * 	rx_conf,\n"
+                     "                             struct rte_mempool * 	mb_pool \n"
+                     "                             )\n");
+              printf( " Call Args: port_id %d  rx_queue_id:%d  nb_rx_desc:%d  socketid:%d  rx_conf:   rte_mempool* \n",
+                                     port_id,           i,      nb_rxd,  rte_eth_dev_socket_id(port_id));
+              FONT_NORMAL();
+              print_rte_eth_rxconf( 0, &rxq_conf);
 #endif
-          CALL_RTE("rte_eth_rx_queue_setup()");    
-          ret = rte_eth_rx_queue_setup(port_id, 0, nb_rxd,
-                                       rte_eth_dev_socket_id(port_id),
-                                       &rxq_conf,
-                                       g_glob.p_pktmbuf_pool);
-          if (ret < 0)
-                  rte_panic("rte_eth_rx_queue_setup:err=%d, port=%u\n",
-                            ret, port_id);
+              CALL_RTE("rte_eth_rx_queue_setup()");    
+              ret = rte_eth_rx_queue_setup(port_id, i , nb_rxd,
+                                            rte_eth_dev_socket_id(port_id),
+                                            &rxq_conf,
+                                            g_glob.p_pktmbuf_pool);
+              if (ret < 0)
+                    rte_panic("rte_eth_rx_queue_setup:err=%d, port=%u\n",
+                              ret, port_id);
+          }
 
           /**********************************/ 
           /* init one TX queue on each port */
@@ -894,13 +897,17 @@ void   initialize_eth_dev_ports(void)
           txq_conf.offloads = local_port_conf.txmode.offloads;
 
           print_rte_eth_txconf( 0, &txq_conf);
-          CALL_RTE("rte_eth_tx_queue_setup()");    
-          ret = rte_eth_tx_queue_setup(port_id, 0, nb_txd,
-                          rte_eth_dev_socket_id(port_id),
-                          &txq_conf);
-          if (ret < 0)
-                  rte_panic("rte_eth_tx_queue_setup:err=%d, port=%u\n",
+
+          for( i = 0 ; i < g_glob.eth_port_cfg_data[port_id].nb_tx_queues ; i++)
+          {
+              CALL_RTE("rte_eth_tx_queue_setup()");    
+              ret = rte_eth_tx_queue_setup(port_id, i , nb_txd,
+                              rte_eth_dev_socket_id(port_id),
+                              &txq_conf);
+              if (ret < 0)
+                    rte_panic("rte_eth_tx_queue_setup:err=%d, port=%u\n",
                             ret, port_id);
+          }
 
           CALL_RTE("rte_eth_promiscuous_enable()\n");    
           rte_eth_promiscuous_enable(port_id);
@@ -1463,8 +1470,10 @@ int ethdev_loop( __attribute__((unused)) void * arg)
             rte_pause();
             continue;
         }
+   
         for(i = 0 ; i < nb_rx ; i++)
         {
+            g_core_stats[lcore_id].rx_event_cnt++ ; // inc stats
             if( events[i].event_type == RTE_EVENT_TYPE_CPU )
             {     
  
@@ -1502,7 +1511,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
  #ifdef TIMER_ADAPTER
                  printf("****    c%d) Received %d Timer events from evt_port_id %d**** \n",lcore_id,nb_rx,event_port_id);
 
-//                 print_rte_event( 0, "event[i]",&events[i]);
+                 print_g_core_stats();
 
                  p_ev_timer = events[i].event_ptr;
                  // set to forward to next core.
@@ -1531,7 +1540,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                  uint8_t *          buf;             
                  MAC_Hdr_t          l2_hdr;
 
-                 g_rx_packet_cnt[lcore_id]++;
+                 g_core_stats[lcore_id].rx_packet_cnt++ ;
                  core_counter--;
                  buf = (uint8_t *) rte_pktmbuf_mtod(p_mbuff, struct rte_ether_hdr *);
                  GetMacData(buf,&l2_hdr);
@@ -1563,7 +1572,7 @@ int ethdev_loop( __attribute__((unused)) void * arg)
                      }
                      if(g_verbose > 2)
                      {
-                         printf(" rx_pkt_cnt: %lu \n",g_rx_packet_cnt[lcore_id]);
+                         printf(" rx_pkt_cnt: %lu \n", g_core_stats[lcore_id].rx_packet_cnt );
                      } 
                  }
 //<FS>

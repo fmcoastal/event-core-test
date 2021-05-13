@@ -670,6 +670,7 @@ int test_loop( __attribute__((unused)) void * arg)
        
                 VERBOSE_M( EVENT_MESSAGES ) printf("%s Received Event: 0x%02x  (events[i].event_type) %s\n",C_BLUE,events[i].event_type,     C_NORMAL );                 
                 VERBOSE_M( EVENT_DETAILS )  print_rte_event(0,"RTE_EVENT: ",&events[i] );                 
+                g_core_stats[lcore_id].rx_event_cnt++ ;
 //////$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ////// switch through the event types
 //////$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -700,7 +701,9 @@ int test_loop( __attribute__((unused)) void * arg)
                          MAC_Hdr_t          l2_hdr;   // MAC_HDR_T is not memory aligned to an l2 header.  
                                                       //   the structure has header size and saves vlans
                                                       //   if it find them in the header. 
-                         g_rx_packet_cnt[lcore_id]++; // increment stats 
+
+                         g_core_stats[lcore_id].rx_packet_cnt++ ;  // increment stats.
+
                          core_counter--;         
               ////////////////////
               // Print Packet Info
@@ -725,7 +728,7 @@ int test_loop( __attribute__((unused)) void * arg)
                              }
                              VERBOSE_M( EVENT_ETH_MESSAGES)
                              {
-                                 printf(" rx_pkt_cnt: %lu \n",g_rx_packet_cnt[lcore_id]);
+                                 printf(" rx_pkt_cnt: %lu \n", g_core_stats[lcore_id].rx_packet_cnt );
                              }
                          }  // end print packet info
                ////////////////////////

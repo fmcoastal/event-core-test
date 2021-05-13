@@ -9,7 +9,6 @@
 #include "main.h"
 
 extern struct test_mode_struct  tm_ethdev;
-extern uint64_t g_rx_packet_cnt[];
 
 extern  uint32_t  g_IP_eth0 ;   // my IP address for arp  
 extern  MacAddr_t g_Mac_eth0 ;  // my MAC address for arp 
