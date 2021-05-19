@@ -54,7 +54,7 @@
 
 #include <rte_event_timer_adapter.h>   // for event timer
 
-#include "fs_spinlock_test.h"
+//#include "fs_spinlock_test.h"
 //#include "fs_print_structures.c"
 // eth dev structures
 
@@ -94,8 +94,8 @@ printf("\n"
 "  ---------------          ------------                                     \n"
 "  |eth port_id 0| -------  |evt_que 0 | --                                  \n"
 "  ---------------          ------------   \\     ------------     --------- \n"
-"                                             >   | evt_prt 0| --> | core 0| \n" 
-"                           ------------   /      ------------     --------- \n"
+"         1 rx q                              >   | evt_prt 0| --> | core 0| \n" 
+"         1 tx q            ------------   /      ------------     --------- \n"
 "                           |evt_que 1 | --                                  \n"
 "                           ------------                                     \n"
 "                                                                            \n"
@@ -103,8 +103,8 @@ printf("\n"
 "  ---------------          ------------                                     \n"
 "  |eth port_id 1| -------  |evt_que 2 | --                                  \n"
 "  ---------------          ------------   \\     ------------     --------- \n"
-"                                             >   | evt_prt 1| --> | core 1| \n" 
-"                           ------------   /      ------------     --------- \n"
+"          1 rxq                              >   | evt_prt 1| --> | core 1| \n" 
+"          1 txq            ------------   /      ------------     --------- \n"
 "                           |evt_que 3 | --                                  \n"
 "                           ------------                                     \n"
 "                                                                            \n"
@@ -406,28 +406,28 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 //       queues and the queue priority        
 
 
- // port 0  - two queues (0 and 1), queue Priority 0x80 and 0x40
+ // event port 0  - two event queues (0 and 1), queue Priority 0x80 and 0x40
    (g_glob.evp.event_p_id + 0)->nb_links = 2;
    (g_glob.evp.event_p_id + 0)->q_id[0] = 0;
    (g_glob.evp.event_p_id + 0)->pri[0]  = 80;
    (g_glob.evp.event_p_id + 0)->q_id[1] = 1;
    (g_glob.evp.event_p_id + 0)->pri[1]  = 40;
  
- // port 1  - two queues (2 and 3), queue Priority 0x80 and 0x40
+ // event port 1  - two event queues (2 and 3), queue Priority 0x80 and 0x40
    (g_glob.evp.event_p_id + 1)->nb_links = 2;
    (g_glob.evp.event_p_id + 1)->q_id[0] = 2;
    (g_glob.evp.event_p_id + 1)->pri[0]  = 80;
    (g_glob.evp.event_p_id + 1)->q_id[1] = 3;
    (g_glob.evp.event_p_id + 1)->pri[1]  = 40;
 
-  // port 2  - two queues (4 and 5), queue Priority 0x80 and 0x40
+  // event port 2  - two event queues (4 and 5), queue Priority 0x80 and 0x40
    (g_glob.evp.event_p_id + 2)->nb_links = 2;
    (g_glob.evp.event_p_id + 2)->q_id[0] = 4;
    (g_glob.evp.event_p_id + 2)->pri[0]  = 80;
    (g_glob.evp.event_p_id + 2)->q_id[1] = 5;
    (g_glob.evp.event_p_id + 2)->pri[1]  = 40;
 
-  // port 3  - two queues (0 and 1), queue Priority 0x80 and 0x40
+  // event port 3  - two event queues (0 and 1), queue Priority 0x80 and 0x40
    (g_glob.evp.event_p_id + 3)->nb_links = 2;
    (g_glob.evp.event_p_id + 3)->q_id[0] = 6;
    (g_glob.evp.event_p_id + 3)->pri[0]  = 80;
@@ -559,7 +559,7 @@ int ethdev_setup( __attribute__((unused)) void * arg)
 //    create tx_adapters    
 //    associate adapter to eth queue and event queue
 //
-//  per dpdk docs (40.1.5. Starting the Adapter Instance)
+//  per dpdk docs (40.1.5. "Starting the Adapter Instance")
 //      event dev should be started before starting adapterss
 
  

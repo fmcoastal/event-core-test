@@ -56,7 +56,7 @@
 #include "fs_ethdev.h"
 
 
-#include "fs_spinlock_test.h"
+//#include "fs_spinlock_test.h"
 //#include "fs_print_structures.c"
 // eth dev structures
 
@@ -107,7 +107,16 @@ printf("\n"
 "                                                                          \n"
 "\n",__FILE__);
 }
+/*
+   ^
+  / \
+ / = \
+< Flw >
+ \ 0 /
+  \ /
+   v
 
+*/
 
 // I will start with 4 cores,  ports, and 4 queues.
 //   goal is to enable RSS and have the packets sprayed to 4 cores
@@ -136,6 +145,10 @@ int      test_cleanup( __attribute__((unused))void * arg);
 void test_description( void);
 
 
+//////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////
+//  Setup for test_app
+
 int test_setup( __attribute__((unused)) void * arg)
 {
 
@@ -150,8 +163,14 @@ int test_setup( __attribute__((unused)) void * arg)
  // number of rx and tx ports per queue
  // g_glob.eth_port_cfg_data[port_id].nb_rx_queues=1 ;
 
-    g_glob.eth_port_cfg_data[0].nb_rx_queues=3 ;
-    g_glob.eth_port_cfg_data[0].nb_tx_queues=3 ;
+    g_glob.eth_port_cfg_data[0].nb_rx_queues=4 ;
+    g_glob.eth_port_cfg_data[0].nb_tx_queues=1 ;
+
+//  set up filters here
+//  -none - above mapping is set up as 1:1 mapping
+
+
+
 
 
 ///////
@@ -171,7 +190,7 @@ int test_setup( __attribute__((unused)) void * arg)
 
     // adapters rx 
     g_glob.rx_adptr.nb_rx_adptr     = 1 ;  // total number of rx_adapters in my design
-    g_glob.rx_adptr.nb_rx_adptr_add = 1 ;  // total number of rx_adapter_adds
+    g_glob.rx_adptr.nb_rx_adptr_add = 4 ;  // total number of rx_adapter_adds
 //??
 
     // adapters tx 
@@ -272,7 +291,6 @@ int test_setup( __attribute__((unused)) void * arg)
                                              event_queue_config = RTE_EVENT_QUEUE_CFG_ALL_TYPE*/
      ( ptr + 1 )->ev_q_conf.priority = 0x80;
 
-#if 1
  // queue 2
      ( ptr + 2 )->event_q_id    = 2;         // event queue index
      ( ptr + 2 )->to_event_port = 1;         // event port this queue feeds
@@ -298,7 +316,6 @@ int test_setup( __attribute__((unused)) void * arg)
      ( ptr + 4 )->ev_q_conf.priority = 0x80;
 
 
-#endif
 }
 
 
@@ -316,10 +333,6 @@ int test_setup( __attribute__((unused)) void * arg)
    (g_glob.evp.event_p_id + 0)->q_id[1] = 1;   // event_queue_id
    (g_glob.evp.event_p_id + 0)->pri[1]  = 80;  // event_queue priority
 
-
-
-
-#if 1
 
 //  Below definition is for 3 queues on a eth_port,  
 //     typically there is only 1 queue on an eth_port unless rte_flow 
@@ -340,7 +353,6 @@ int test_setup( __attribute__((unused)) void * arg)
    (g_glob.evp.event_p_id + 3)->pri[0]  = 80;
 
 
-#endif
 
 //  You should only really need one adapter.  
 
@@ -364,7 +376,7 @@ int test_setup( __attribute__((unused)) void * arg)
 //  
     g_glob.rx_adptr.rx_adptr[0]  = 0 ;     // 
 
-// rx_adapter 0  connects eth dev 0/port 0 to event queue 0
+// rx_adapter 0  connects eth dev 0/port 0 to event queue 1
     g_glob.rx_adptr.rx_adptr_add[0].adapter_id = 0 ;     // 
     g_glob.rx_adptr.rx_adptr_add[0].eth_dev_port = 0 ;   // 
     g_glob.rx_adptr.rx_adptr_add[0].eth_dev_queue = 0 ;  // 
@@ -372,24 +384,29 @@ int test_setup( __attribute__((unused)) void * arg)
     g_glob.rx_adptr.rx_adptr_add[0].sched_type = RTE_SCHED_TYPE_ORDERED;        // 
     g_glob.rx_adptr.rx_adptr_add[0].priority = 0x80;        // 
 
-#if 0
-// rx_adapter 0  connects eth dev 1/port 0 to event queue 1
+// rx_adapter 0  connects eth dev 0/port 1 to event queue 2
     g_glob.rx_adptr.rx_adptr_add[1].adapter_id = 0 ;     //
-    g_glob.rx_adptr.rx_adptr_add[1].eth_dev_port = 1 ;   //
-    g_glob.rx_adptr.rx_adptr_add[1].eth_dev_queue = 0 ;  //
-    g_glob.rx_adptr.rx_adptr_add[1].event_dev_queue = 1; //
+    g_glob.rx_adptr.rx_adptr_add[1].eth_dev_port = 0 ;   //
+    g_glob.rx_adptr.rx_adptr_add[1].eth_dev_queue = 1 ;  //
+    g_glob.rx_adptr.rx_adptr_add[1].event_dev_queue = 2; //
     g_glob.rx_adptr.rx_adptr_add[1].sched_type = RTE_SCHED_TYPE_ORDERED;        //
     g_glob.rx_adptr.rx_adptr_add[1].priority = 0x80;        //
 
-// rx_adapter 0  connects eth dev 2/port 0 to event queue 2
+// rx_adapter 0  connects eth dev 2/port 0 to event queue 3
     g_glob.rx_adptr.rx_adptr_add[2].adapter_id = 0 ;     //
-    g_glob.rx_adptr.rx_adptr_add[2].eth_dev_port = 2 ;   //
-    g_glob.rx_adptr.rx_adptr_add[2].eth_dev_queue = 0 ;  //
-    g_glob.rx_adptr.rx_adptr_add[2].event_dev_queue = 2; //
+    g_glob.rx_adptr.rx_adptr_add[2].eth_dev_port = 0 ;   //
+    g_glob.rx_adptr.rx_adptr_add[2].eth_dev_queue = 2 ;  //
+    g_glob.rx_adptr.rx_adptr_add[2].event_dev_queue = 3; //
     g_glob.rx_adptr.rx_adptr_add[2].sched_type = RTE_SCHED_TYPE_ORDERED;        //
     g_glob.rx_adptr.rx_adptr_add[2].priority = 0x80;        //
 
-#endif
+// rx_adapter 0  connects eth dev 2/port 0 to event queue 4
+    g_glob.rx_adptr.rx_adptr_add[2].adapter_id = 0 ;     //
+    g_glob.rx_adptr.rx_adptr_add[2].eth_dev_port = 0 ;   //
+    g_glob.rx_adptr.rx_adptr_add[2].eth_dev_queue = 3 ;  //
+    g_glob.rx_adptr.rx_adptr_add[2].event_dev_queue = 4; //
+    g_glob.rx_adptr.rx_adptr_add[2].sched_type = RTE_SCHED_TYPE_ORDERED;        //
+    g_glob.rx_adptr.rx_adptr_add[2].priority = 0x80;        //
 
 //    g_glob.tx_adptr.nb_tx_adptr_adds = 2;
 
