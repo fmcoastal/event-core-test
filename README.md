@@ -251,3 +251,253 @@ Need to understand:
      cat /sys/kernel/debug/octeontx2/nix/ndc_tx_hits_miss
 
 sso_info
+hiral
+#!/bin/bash
+
+FILENAME=sso_info.txt
+
+
+echo "" > $FILENAME
+
+
+YES="0"
+if [ $YES == "1" ] ; then 
+    cat /sys/kernel/debug/octeontx2/rsrc_alloc >> $FILENAME
+fi
+
+
+if [ $YES == "1" ] ; then 
+    cat /sys/kernel/debug/octeontx2/rvu_pf_cgx_map >> $FILENAME
+fi
+
+
+echo "#====================================================================" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+echo "# sso" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+
+
+
+YES="1"
+if [ $YES == "1" ] ; then
+
+    # only do the workslots of interest  0 - 51
+    echo "/sys/kernel/debug/octeontx2/sso/sso_pc" >> $FILENAME
+    dmesg -c
+#   echo "" >>$FILENAME
+#   echo " ----  sso_pc =  $i  --- " >> $FILENAME
+    cat /sys/kernel/debug/octeontx2/sso/sso_pc
+    dmesg -c >> $FILENAME
+fi
+
+
+#YES="0"
+if [ $YES == "1" ] ; then 
+
+    # only do the workslots of interesti  0 - 51
+    echo "/sys/kernel/debug/octeontx2/sso/hws/sso_hws_info" >> $FILENAME
+    dmesg -c 
+    for i in {0..2} ; do 
+       echo $i  > /sys/kernel/debug/octeontx2/sso/hws/sso_hws_info
+       dmesg -c >> $FILENAME
+    done     #   i
+fi
+
+
+#YES="0"
+if [ $YES == "1" ] ; then 
+
+# only do the groups of interest
+    echo "/sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_pc" >> $FILENAME
+    dmesg -c 
+    for i in {0..15} ; do 
+       echo $i   > /sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_pc
+       dmesg -c   >> $FILENAME
+    done     #   i
+fi
+
+
+#YES="0"
+if [ $YES == "1" ] ; then 
+# only do the group thresholds of interest   0-255
+    echo "/sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_thresh" >> $FILENAME
+    dmesg -c
+    for i in {0..15} ; do
+       echo $i   > /sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_thresh
+       dmesg -c   >> $FILENAME
+    done     #   i
+fi
+
+
+#YES="0"
+if [ $YES == "1" ] ; then
+
+    echo "/sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_taq_walk" >> $FILENAME
+    dmesg -c
+    for i in {0..2} ; do
+        echo $i > /sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_taq_walk
+        dmesg -c >> $FILENAME
+    done     #   i
+fi
+
+
+YES="0"
+if [ $YES == "1" ] ; then
+
+    echo "/sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_iaq_walk" >> $FILENAME
+    dmesg -c
+    for i in {0..2} ; do
+        echo $i > /sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_iaq_walk
+        dmesg -c >> $FILENAME
+    done     #   i
+fi
+
+
+#YES="0"
+if [ $YES == "1" ] ; then
+
+    echo "/sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_ient_walk" >> $FILENAME
+    dmesg -c
+    cat  > /sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_ient_walk
+    dmesg -c >> $FILENAME
+fi
+
+
+#YES="0"
+if [ $YES == "1" ] ; then
+
+    echo "/sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_free_list_walk" >> $FILENAME
+    dmesg -c
+    cat   /sys/kernel/debug/octeontx2/sso/hwgrp/sso_hwgrp_free_list_walk
+    dmesg -c >> $FILENAME
+fi
+
+
+
+echo "#====================================================================" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+echo "# npc" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+
+
+
+YES="1"
+if [ $YES == "1" ] ; then
+   
+    echo "/sys/kernel/debug/octeontx2/npc/mcam_info" >> $FILENAME
+    cat   /sys/kernel/debug/octeontx2/npc/mcam_info  >> $FILENAME
+fi
+
+if [ $YES == "1" ] ; then
+   
+    echo "/sys/kernel/debug/octeontx2/npc/mcam_rules" >> $FILENAME
+    cat   /sys/kernel/debug/octeontx2/npc/mcam_rules  >> $FILENAME
+fi
+
+if [ $YES == "1" ] ; then
+   
+    echo "/sys/kernel/debug/octeontx2/npc/rx_miss_act_stats" >> $FILENAME
+    cat   /sys/kernel/debug/octeontx2/npc/rx_miss_act_stats  >> $FILENAME
+fi
+
+
+echo "#====================================================================" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+echo "# nix" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+
+
+YES="0"
+if [ $YES == "1" ] ; then
+   
+    echo "NOT DONE or CHECKED /nix/qsize  "
+
+    echo "/sys/kernel/debug/octeontx2/nix/qsize" >> $FILENAME
+    cat   /sys/kernel/debug/octeontx2/nix/qsize  >> $FILENAME
+fi
+
+
+
+
+echo "#====================================================================" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+echo "# cgx" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+
+
+YES="1"
+if [ $YES == "1" ] ; then
+ 
+    dmesg -c 
+    for i in {0..2} ; do
+        for j  in {0..3} ; do
+
+            if [ -e /sys/kernel/debug/octeontx2/cgx/cgx$i/lmac$j/stats ] ; then
+                echo "/sys/kernel/debug/octeontx2/cgx/cgx$i/lmac$j/stats" >> $FILENAME
+                cat /sys/kernel/debug/octeontx2/cgx/cgx$i/lmac$j/stats  >> $FILENAME 
+                dmesg -c >> $FILENAME
+            fi
+
+        done     #   j
+    done     #   i
+
+fi 
+
+
+
+echo "#====================================================================" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+echo "# npa" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+echo "#====================================================================" >> $FILENAME
+
+#Usage: echo <npalf> [pool number/all] > /sys/kernel/debug/octeontx2/npa/pool_ctx
+#       cat /sys/kernel/debug/octeontx2/npa/pool_ctx
+#echo 0 0 > /sys/kernel/debug/octeontx2/npa/pool_ctx
+#cat /sys/kernel/debug/octeontx2/npa/pool_ctx
+
+YES="0"
+if [ $YES == "1" ] ; then
+   
+    echo "NOT DONE or CHECKED /nix/qsize  "
+
+
+ echo 1 0 > /sys/kernel/debug/octeontx2/npa/pool_ctx
+ cat  /sys/kernel/debug/octeontx2/npa/pool_ctx
+
+
+fi 
+
+
+
+
+
+
+
+
+
+
+
+
+
+========================================================================
+
+#!/bin/bash
+
+for lf in `seq 0 127`; do do
+  txcsr nixx_af_lfx_rx_statx -a 0 -b $lf -c $1 -x -z -i
+done
+
+
+#!/bin/bash
+    for i in {0..3} ; do
+        for j  in {0..1} ; do
+             for k  in {0..3} ; do
+                txcsr sso_af_hwsx_sx_grpmskx -a $i -b $j -c $k
+             done  
+        done
+    done
