@@ -28,11 +28,30 @@
 
 
 
+/*//////////////////////////
+  Print a character byte array
+    color -  will change the text color something other than white
+               see fs_extras.h for color definitions
+               eg:
+                   static const char C_GREEN[]   ={0x1b,'[','3','2','m',0x00};   
+*/
 
-////////////////////////////
-//   Print a character byte array
+
 
 void PrintBuff(uint8_t * buffer, int32_t bufferSize,uint8_t * Address,const char * title);
+void PrintBuffc(uint8_t * buffer, int32_t bufferSize,uint8_t * Address,const char * title,const char * color);
+
+
+/*//////////////////////////
+   Diff buffer
+    color -  will change the text color something other than white
+               see fs_extras.h for color definitions
+               eg:
+                   static const char C_GREEN[]   ={0x1b,'[','3','2','m',0x00};   
+*/
+void DiffBuff(uint8_t * b1, uint8_t * b2, int32_t cmp_len,uint8_t * Address,const char * title,const char * color);
+
+
 
 
 #endif

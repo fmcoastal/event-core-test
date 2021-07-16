@@ -110,13 +110,16 @@ char * format_rte_mac_addr(char * str,struct rte_ether_addr *m )
  */
 void print_rte_mbuf(int indent, struct rte_mbuf *m)
 {
+    uint8_t * p; 
     INDENT(indent);
 
 //    m->tx_offload=0xdeadbeef;
 
     printf("%s struct rte_mbuf:  address:%p { \n"  ,s,m);
 
-    printf("%s   (void *)   buf_addr:       0x%p      offset:0x%lx \n",s,m->buf_addr   ,offsetof(struct rte_mbuf, buf_addr));
+    printf("%s   (void *)   buf_addr:       0x%p       offset:0x%lx \n",s,m->buf_addr   ,offsetof(struct rte_mbuf, buf_addr));
+    printf("%s   (rte_iova_t) buf_iova:     0x%016lx  offset:0x%lx \n",s,m->buf_iova   ,offsetof(struct rte_mbuf, buf_iova));
+    printf("%s   (uint16_t) data_off        0x%04x              offset:0x%lx \n",s,m->data_off   ,offsetof(struct rte_mbuf, data_off));
     printf("%s   (uint16_t) refcnt          0x%04x              offset:0x%lx \n",s,m->refcnt     ,offsetof(struct rte_mbuf, refcnt));
     printf("%s   (uint16_t) nb_segs         0x%04x              offset:0x%lx \n",s,m->nb_segs    ,offsetof(struct rte_mbuf,nb_segs ));
     printf("%s   (uint16_t) port            0x%04x              offset:0x%lx \n",s,m->port       ,offsetof(struct rte_mbuf,port ));
@@ -153,17 +156,30 @@ void print_rte_mbuf(int indent, struct rte_mbuf *m)
 //    printf("%s   (uint32_t) lo         0x%08x\n",s,m->lo);
 //    printf("%s   (uint32_t) hi         0x%08x\n",s,m->hi);
 
-    printf("%s   (void *) userdata                 0x%p\n",s,m->userdata);
-    printf("%s   (uint64_t) udata64                0x%016lx\n",s,m->udata64);
-    printf("%s   (uint64_t) tx_offload             0x%016lx\n",s,m->tx_offload);
+    printf("%s   (void *) userdata                 0x%p             offset:0x%lx \n",s,m->userdata, offsetof(struct rte_mbuf,userdata ));
+    printf("%s   (uint64_t) udata64                0x%016lx         offset:0x%lx \n",s,m->udata64 , offsetof(struct rte_mbuf,udata64  ));
+    printf("%s   (uint64_t) tx_offload             0x%016lx         offset:0x%lx \n",s,m->tx_offload, offsetof(struct rte_mbuf,tx_offload));
     printf("%s   (uint64_t:%d) l2_len               0x%016x\n",s,RTE_MBUF_L2_LEN_BITS,m->l2_len);
     printf("%s   (uint64_t:%d) l3_len               0x%016x\n",s,RTE_MBUF_L3_LEN_BITS,m->l3_len);
     printf("%s   (uint64_t:%d) l4_len               0x%016x\n",s,RTE_MBUF_L4_LEN_BITS,m->l4_len);
-    printf("%s   (uint64_t:%d) tso_segsz           0x%016x\n",s,RTE_MBUF_TSO_SEGSZ_BITS,m->tso_segsz);
+    printf("%s   (uint64_t:%d) tso_segsz            0x%016x\n",s,RTE_MBUF_TSO_SEGSZ_BITS,m->tso_segsz);
     printf("%s   (uint64_t:%d) outer_l3_len         0x%016x\n",s,RTE_MBUF_OUTL3_LEN_BITS,m->outer_l3_len);
     printf("%s   (uint64_t:%d) outer_l2_len         0x%016x\n",s,RTE_MBUF_OUTL2_LEN_BITS,m->outer_l2_len);
+//    printf("%s   (struct fdir )(uint32_t) hi       0x%08x         offset:0x%lx \n",s,m->fdir.hi,offsetof(struct rte_mbuf,fdir));
+//    printf("%s   (struct rte_mbuf_sched ) sched                   offset:0x%lx \n",s,offsetof(struct rte_mbuf,rte_mbuf_sched));
+//    printf("%s   (union ) tx_adapter                0x016x         offset:0x%lx \n",s,  offsetof(struct rte_mbuf,tx_adapter));
+//    printf("%s   (uint16_t) txq         0x%04x              offset:0x%lx \n",s,m->nb_segs    ,offsetof(struct rte_mbuf,txq ));
+    printf("%s   (union ) hash                      0x016x         offset:0x%lx \n",s,offsetof(struct rte_mbuf,hash));
 
     printf( "Txoffload is offset 0x%lx bytes intothe header \n",offsetof(struct rte_mbuf, tx_offload) );
+
+ 
+    printf( "Payload address (rte_pktmbuf_mtod(m, struct rte_ether_hdr *): %p  \n",rte_pktmbuf_mtod(m, struct rte_ether_hdr *) ); 
+    printf( " EVOL EVOL  \"m->buf_addr\" may not be the same address as \"m\"  \n        because of cache line alignement requirements  \n"); 
+    p = (((uint8_t*) m->buf_addr)  + m->data_off );
+    PrintBuff(p,0x20,p,"first 32 bytes of mbuff payload");
+
+    
 
 }
 
@@ -194,6 +210,7 @@ void print_rte_mbuf_pkt(int indent, struct rte_mbuf *m)
 
 //  the packet date
      eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+     printf("%s-->pktmbuf:   %p payload address: %p  \n",s,m,eth_hdr); 
      l3 = (uint8_t *)eth_hdr + sizeof(struct rte_ether_hdr);
 
      printf("%s L2/MAC Hdr):  \n",s);
