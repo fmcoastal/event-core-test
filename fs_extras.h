@@ -79,8 +79,8 @@ void print_xxx  (int indent,const char* string,int id,struct xxx *p)
 #define INDENT_SIZE 3
 #define INDENT(x) \
    char s[64]= {0};\
-   int i;\
-   for ( i = 0 ; i < (INDENT_SIZE * x) ; i++) s[i] = ' ';
+   int iiiii;\
+   for ( iiiii = 0 ; iiiii < (INDENT_SIZE * x) ; iiiii++) s[iiiii] = ' ';
 
 
 /******************i*****/

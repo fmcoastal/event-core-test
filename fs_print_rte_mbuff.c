@@ -12,12 +12,13 @@
 #include "fs_extras.h"
 #include "fs_print_rte_mbuff.h"
 
+#if 0
 #define INDENT_SIZE 3
 #define INDENT(x) \
     char s[64]= {0};\
     int i;\
     for ( i = 0 ; i < (INDENT_SIZE * x) ; i++) s[i] = ' ';
-
+#endif
 
 
 /** Information for a given RSS type. */
