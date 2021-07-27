@@ -1,29 +1,33 @@
-#!/bin/bash -x
-
+#!/bin/bash 
+cat /proc/cmdline
 
 echo 0xa063 - eth devices - pf
 echo 0xa0f8 - loopback devices -pf
 echo 0xa0f9 - SSO devices
 echo 0xa0fb - mempool devices - pf
+echo 0xa0fe - crypto devices - vf
 echo 0xa0fd - crypto devices - pf
+
+
+
+
 
 echo #--  inform vfio_pci about SSO  --" 
      echo "177d a0f9" >  /sys/bus/pci/drivers/vfio-pci/new_id
-     dpdk-devbind.py -s | grep a0f9
-     
-     #echo 0 > /sys/bus/pci/devices/0002:07:00.0/limits/sso
-     #echo 0 > /sys/bus/pci/devices/0002:08:00.0/limits/sso
-     #echo 0 > /sys/bus/pci/devices/0002:09:00.0/limits/sso
-     echo 0 > /sys/bus/pci/devices/0002:0a:00.0/limits/sso
-     echo 0 > /sys/bus/pci/devices/0002:0b:00.0/limits/sso
-     echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/sso
-     
-     #echo 0 > /sys/bus/pci/devices/0002:07:00.0/limits/ssow
-     #echo 0 > /sys/bus/pci/devices/0002:08:00.0/limits/ssow
-     #echo 0 > /sys/bus/pci/devices/0002:09:00.0/limits/ssow
-     echo 0 > /sys/bus/pci/devices/0002:0a:00.0/limits/ssow
-     echo 0 > /sys/bus/pci/devices/0002:0b:00.0/limits/ssow
-     echo 0 > /sys/bus/pci/devices/0002:0e:00.0/limits/ssow
+
+
+# reset driver limits
+
+PCI_DEVS="$(lspci)"
+for dev in $(echo "$PCI_DEVS" |grep "f9" | cut -d ' ' -f 1);  do
+     echo $dev
+     echo  0 > /sys/bus/pci/devices/$dev/limits/cpt
+     echo  0 > /sys/bus/pci/devices/$dev/limits/sso
+     echo  0 > /sys/bus/pci/devices/$dev/limits/ssow
+#     echo  0 > /sys/bus/pci/devices/$dev/limits/tim 
+#     echo  0 > /sys/bus/pci/devices/$dev/limits/npa 
+done
+
      
      #manually reset driver limits
      
@@ -40,7 +44,11 @@ echo #--  inform vfio_pci about SSO  --"
      echo 0002:0e:00.0 > /sys/bus/pci/devices/0002\:0e\:00.0/driver/unbind
      echo 0002:0e:00.0 > /sys/bus/pci/drivers/vfio-pci/bind
 
+#  set up crypto vf 
+echo #--  inform vfio_pci about crypt vf  devices  --" 
+     echo "177d a0fe" > /sys/bus/pci/drivers/vfio-pci/new_id
 
+<<<<<<< HEAD
 USE_PF=1
      
 if [ "$USE_PF" == "1" ] ; then 
@@ -61,6 +69,12 @@ if [ "$USE_PF" == "1" ] ; then
      done
   
 else
+=======
+     echo 0002:10:00.0 > /sys/bus/pci/drivers/octeontx2-cpt/unbind 
+     echo 64 > /sys/bus/pci/devices/0002\:10\:00.0/limits/cpt
+     echo 0002:10:00.0 > /sys/bus/pci/drivers/octeontx2-cpt/bind
+     echo 24 > /sys/bus/pci/drivers/octeontx2-cpt/0002\:10\:00.0/sriov_numvfs
+>>>>>>> c4432d5a6e1b82c2ae1b38c6882174cfbd10fdb8
 
      echo #--  inform vfio_pci about eth devices  --" 
      echo '177d a063' > /sys/bus/pci/drivers/vfio-pci/new_id
@@ -111,23 +125,28 @@ fi
 echo "not here"     
 
 
-ip l s eth2 up
-ip a a  10.1.0.99/24 dev eth2
-
-dpdk-devbind.py  -u 0002:04:00.0
-dpdk-devbind.py --bind=octeontx2-nicpf  0002:04:00.0
-
-# create a VF 
-echo 1 >  /sys/class/net/eth2/device/sriov_numvfs
-
-ethtool -K eth2 ntuple on
-ethtool -U eth2 flow-type ether proto 0x0800 vf 0 queue 0 
-
-
-dpdk-devbind.py -u 0002:04:00.1
-dpdk-devbind.py --bind=vfio-pci  0002:04:00.1
-
-
+#     
+# create a VF on eth 2
+#  split off IPV4 Traffic to it
+#  make the VF available to DPDK.
+# <START>
+     ip l s eth2 up
+     ip a a  10.1.0.99/24 dev eth2
+     
+     dpdk-devbind.py  -u 0002:04:00.0
+     dpdk-devbind.py --bind=octeontx2-nicpf  0002:04:00.0
+     
+     # create a VF 
+     echo 1 >  /sys/class/net/eth2/device/sriov_numvfs
+     
+     ethtool -K eth2 ntuple on
+     ethtool -U eth2 flow-type ether proto 0x0800 vf 0 queue 0 
+     
+     
+     dpdk-devbind.py -u 0002:04:00.1
+     dpdk-devbind.py --bind=vfio-pci  0002:04:00.1
+     
+# <end>
 
 
 

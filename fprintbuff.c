@@ -12,7 +12,16 @@
 
 #define fsprint printf
 
+
+
+
 void PrintBuff(uint8_t * buffer, int32_t bufferSize,uint8_t * Address,const char * title)
+{
+      PrintBuffc(buffer, bufferSize, Address,title,NULL);
+}
+
+
+void PrintBuffc(uint8_t * buffer, int32_t bufferSize,uint8_t * Address,const char * title,const char * color)
 {
     uint8_t * tmpptr0  = buffer; 
     uint8_t * tmpptr1  = tmpptr0; 
@@ -22,7 +31,9 @@ void PrintBuff(uint8_t * buffer, int32_t bufferSize,uint8_t * Address,const char
     int64_t  j          = 0 ;
     int64_t  PrintCount = 0 ;   // used as counter to denote when to print \nadderss
     int64_t  BlankCnt   = 0 ;
+    const char C_NORMAL[]  ={0x1b,'[','0','m',0x00};     /* NORMAL =$'\e[0m'  */
    
+    if(color != NULL)    fsprint("%s",color);
     if( title != NULL)   fsprint("\n%s\n",title);
 #if 1
 
@@ -182,6 +193,82 @@ void PrintBuff(uint8_t * buffer, int32_t bufferSize,uint8_t * Address,const char
             fsprint(".");
         tmpptr1++;
     }
+
+    if(color != NULL)    fsprint("%s", C_NORMAL);
     fsprint("\n");
 }
+
+
+
+#define FS_ALIGNED 0
+#define FS_UNNALIGNED_START 1
+
+void DiffBuff(uint8_t * b1, uint8_t * b2, int32_t cmp_len,uint8_t * Address,const char * title,const char * color)
+{
+   
+    int64_t  i                 = 0 ;
+    int64_t  cnt_not_aligned   = 0 ;
+    int64_t  cnt_aligned       = 0 ;
+    int64_t  state             = FS_ALIGNED ;
+    uint8_t  *u_ptr; 
+    uint64_t  u_ptr_index; 
+    const char C_NORMAL[]  ={0x1b,'[','0','m',0x00};     /* NORMAL =$'\e[0m'  */
+
+    if(color != NULL)    fsprint("%s",color);
+    if( title != NULL)   fsprint("\n%s\n",title);
+#if 1
+
+    fsprint("  b1:%p   b2:%p   cmp_len:0x%016llx  add:%p\n",b1,b2,(LLU)cmp_len,Address);
+
+#endif
+    if( (b1 == NULL)  || (b2 == NULL))
+    {
+        fsprint("One of the arguments passed is NULL.  \n");
+        fsprint("  b1:%p   b2:%p   cmp_len:0x%016llx  add:%p\n",b1,b2,(LLU)cmp_len,Address);
+        return;
+    }
+    
+   for ( i = 0 ; i < cmp_len ; i++)
+   {
+      switch (state) {
+      case FS_ALIGNED:
+          if( *(b1+i)  != *(b2+i))
+          {
+              cnt_not_aligned = 1; // reset the un-aligned count
+              u_ptr = (b1+i);
+              u_ptr_index = i;
+              state = FS_UNNALIGNED_START;
+          }
+          else
+          {
+              cnt_aligned++;
+          }  
+          break;
+      case FS_UNNALIGNED_START:
+          if( *(b1+i)  == *(b2+i))
+          {
+              cnt_aligned = 1; // reset the un-aligned count
+              state = FS_ALIGNED;
+              PrintBuff( u_ptr, cnt_not_aligned ,(uint8_t *)u_ptr_index,"Miss Compare");
+          }
+          else
+          {
+              cnt_not_aligned++;
+          }  
+          break;
+ 
+      default:
+         fsprint("I am lots  %d-%s:%s \n",__LINE__,__FILE__,__FUNCTION__);
+         i = cmp_len;
+         break;
+      } // end Switch
+   } //end for loop
+
+    if(color != NULL)    fsprint("%s", C_NORMAL);
+
+}
+
+
+
+
 

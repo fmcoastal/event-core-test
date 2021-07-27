@@ -12,12 +12,13 @@
 #include "fs_extras.h"
 #include "fs_print_rte_mbuff.h"
 
+#if 0
 #define INDENT_SIZE 3
 #define INDENT(x) \
     char s[64]= {0};\
     int i;\
     for ( i = 0 ; i < (INDENT_SIZE * x) ; i++) s[i] = ' ';
-
+#endif
 
 
 /** Information for a given RSS type. */
@@ -110,13 +111,19 @@ char * format_rte_mac_addr(char * str,struct rte_ether_addr *m )
  */
 void print_rte_mbuf(int indent, struct rte_mbuf *m)
 {
+    uint8_t * p; 
+    char string[128]; 
+    int i; 
+    int done;
     INDENT(indent);
 
 //    m->tx_offload=0xdeadbeef;
 
     printf("%s struct rte_mbuf:  address:%p { \n"  ,s,m);
 
-    printf("%s   (void *)   buf_addr:       0x%p      offset:0x%lx \n",s,m->buf_addr   ,offsetof(struct rte_mbuf, buf_addr));
+    printf("%s   (void *)   buf_addr:       0x%p       offset:0x%lx \n",s,m->buf_addr   ,offsetof(struct rte_mbuf, buf_addr));
+    printf("%s   (rte_iova_t) buf_iova:     0x%016lx  offset:0x%lx \n",s,m->buf_iova   ,offsetof(struct rte_mbuf, buf_iova));
+    printf("%s   (uint16_t) data_off        0x%04x              offset:0x%lx \n",s,m->data_off   ,offsetof(struct rte_mbuf, data_off));
     printf("%s   (uint16_t) refcnt          0x%04x              offset:0x%lx \n",s,m->refcnt     ,offsetof(struct rte_mbuf, refcnt));
     printf("%s   (uint16_t) nb_segs         0x%04x              offset:0x%lx \n",s,m->nb_segs    ,offsetof(struct rte_mbuf,nb_segs ));
     printf("%s   (uint16_t) port            0x%04x              offset:0x%lx \n",s,m->port       ,offsetof(struct rte_mbuf,port ));
@@ -153,26 +160,41 @@ void print_rte_mbuf(int indent, struct rte_mbuf *m)
 //    printf("%s   (uint32_t) lo         0x%08x\n",s,m->lo);
 //    printf("%s   (uint32_t) hi         0x%08x\n",s,m->hi);
 
-    printf("%s   (void *) userdata                 0x%p\n",s,m->userdata);
-    printf("%s   (uint64_t) udata64                0x%016lx\n",s,m->udata64);
-    printf("%s   (uint64_t) tx_offload             0x%016lx\n",s,m->tx_offload);
+    printf("%s   (void *) userdata                 0x%p             offset:0x%lx \n",s,m->userdata, offsetof(struct rte_mbuf,userdata ));
+    printf("%s   (uint64_t) udata64                0x%016lx         offset:0x%lx \n",s,m->udata64 , offsetof(struct rte_mbuf,udata64  ));
+    printf("%s   (uint64_t) tx_offload             0x%016lx         offset:0x%lx \n",s,m->tx_offload, offsetof(struct rte_mbuf,tx_offload));
     printf("%s   (uint64_t:%d) l2_len               0x%016x\n",s,RTE_MBUF_L2_LEN_BITS,m->l2_len);
     printf("%s   (uint64_t:%d) l3_len               0x%016x\n",s,RTE_MBUF_L3_LEN_BITS,m->l3_len);
     printf("%s   (uint64_t:%d) l4_len               0x%016x\n",s,RTE_MBUF_L4_LEN_BITS,m->l4_len);
-    printf("%s   (uint64_t:%d) tso_segsz           0x%016x\n",s,RTE_MBUF_TSO_SEGSZ_BITS,m->tso_segsz);
+    printf("%s   (uint64_t:%d) tso_segsz            0x%016x\n",s,RTE_MBUF_TSO_SEGSZ_BITS,m->tso_segsz);
     printf("%s   (uint64_t:%d) outer_l3_len         0x%016x\n",s,RTE_MBUF_OUTL3_LEN_BITS,m->outer_l3_len);
     printf("%s   (uint64_t:%d) outer_l2_len         0x%016x\n",s,RTE_MBUF_OUTL2_LEN_BITS,m->outer_l2_len);
+//    printf("%s   (struct fdir )(uint32_t) hi       0x%08x         offset:0x%lx \n",s,m->fdir.hi,offsetof(struct rte_mbuf,fdir));
+//    printf("%s   (struct rte_mbuf_sched ) sched                   offset:0x%lx \n",s,offsetof(struct rte_mbuf,rte_mbuf_sched));
+//    printf("%s   (union ) tx_adapter                0x016x         offset:0x%lx \n",s,  offsetof(struct rte_mbuf,tx_adapter));
+//    printf("%s   (uint16_t) txq         0x%04x              offset:0x%lx \n",s,m->nb_segs    ,offsetof(struct rte_mbuf,txq ));
+    printf("%s   (union ) hash                      0x016x         offset:0x%lx \n",s,offsetof(struct rte_mbuf,hash));
 
     printf( "Txoffload is offset 0x%lx bytes intothe header \n",offsetof(struct rte_mbuf, tx_offload) );
 
+ 
+    printf( "Payload address (rte_pktmbuf_mtod(m, struct rte_ether_hdr *): %p  \n",rte_pktmbuf_mtod(m, struct rte_ether_hdr *) ); 
+    printf( " EVOL EVOL  \"m->buf_addr\" may not be the same address as \"m\"  \n        because of cache line alignement requirements  \n"); 
+    i = 0;
+    done = 0;
+    while (done == 0)
+    {
+
+         sprintf(string," Data for mbuf segment %d",i);
+         p = (((uint8_t*) m->buf_addr)  + m->data_off );
+         PrintBuff(p,m->data_len,p,string);
+         i++;
+         if (m->next == NULL) done =1;
+         m = m->next;
+    } 
+
+    printf("\n end of %s\n",__FUNCTION__);
 }
-
-
-
-
-
-
-
 
 
 
@@ -194,6 +216,7 @@ void print_rte_mbuf_pkt(int indent, struct rte_mbuf *m)
 
 //  the packet date
      eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+     printf("%s-->pktmbuf:   %p payload address: %p  \n",s,m,eth_hdr); 
      l3 = (uint8_t *)eth_hdr + sizeof(struct rte_ether_hdr);
 
      printf("%s L2/MAC Hdr):  \n",s);
@@ -253,5 +276,130 @@ void print_rte_mbuf_pkt(int indent, struct rte_mbuf *m)
           }
       }
 }
+
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+int  fs_string_init(fs_string_t *ptr,char * my_string)
+{
+     uint64_t i;
+       
+     if (ptr  == NULL)  return -1;
+     ptr->index = 0;
+     ptr->instance = 0xffffffff;
+     memset(ptr->string,0,8);   // make sure first character looked at is a 0x00
+     if( my_string == NULL)
+     {
+        strcpy((char *)ptr->string_base,FS_STRING);
+        return 0 ;
+     }
+     else
+     {
+         for ( i = 0 ; ( *(my_string + i) != 0x00) && (i < (FS_STRING_MAX - sizeof(uint32_t) - 4)) ; i++) /* 0x, 0x00 & -1 */
+         {
+              ptr->string_base[i] = *(my_string + i);
+         }
+     }  
+     return 0;
+}
+
+
+
+uint8_t  fs_string_getch( fs_string_t *ptr)
+{
+    // test if pointing to the end of the string 
+    ptr->index++;
+    if( *(ptr->string + ptr->index) == 0x00)
+    {
+        ptr->instance++;
+        ptr->index = 0;
+        sprintf( (char *)(ptr->string),"%s0x%08x",(char *)(ptr->string_base),ptr->instance);
+    }
+    return (*(ptr->string + ptr->index));
+
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+
+
+int fs_mbuf_init( struct rte_mempool * pool, fs_mbuf_t * p )
+{
+     if ( pool == NULL)  return -1;
+     if ( p    == NULL)  return -2;
+     // save the pool we are to allocate mbuff-s from
+
+     p->pool = pool;
+
+     p->m_base =  rte_pktmbuf_alloc(p->pool);
+     if (p->m_base == NULL )
+        rte_exit(EXIT_FAILURE, "Not enough mbufs available A");
+
+     p->m = p->m_base;   // copy the base to a working instance
+     // get the starting point to write in the buffer
+     p->my_fptr = (uint8_t*)rte_pktmbuf_mtod( p->m, struct rte_ether_hdr *);
+     // set the size of the data we will write.
+     p->mbuf_data_len_sz = p->m->buf_len - RTE_PKTMBUF_HEADROOM;
+     // init the counting loop index
+     p->mbuf_wr_cnt =  p->mbuf_data_len_sz;
+
+     return 0;
+     
+}
+
+
+int fs_mbuf_add_buf(fs_mbuf_t * p, uint8_t * buf, int64_t buf_sz )
+{
+   struct rte_mbuf * tmp_mbuf;
+
+    while( buf_sz > 0 )
+    {
+        if(  p->mbuf_wr_cnt  <= 0)
+        {
+            // set the size of the data in the current mbuf
+            p->m->data_len       =  p->mbuf_data_len_sz  ;        // set mbuf data_len
+            p->m_base->pkt_len  +=  p->mbuf_data_len_sz  ;        // update pkt_total
+
+            tmp_mbuf =  rte_pktmbuf_alloc(p->pool);
+            if (tmp_mbuf == NULL )
+                   rte_exit(EXIT_FAILURE, "Not enough mbufs available B");
+ 
+            // increment the segs on the base mbuf.
+            p->m_base->nb_segs ++ ;
+            // sent the next pointer 
+            p->m->next =  tmp_mbuf;
+
+            p->m = tmp_mbuf;           
+            p->m->next = NULL ;                         // set next mbuf to null
+            p->my_fptr = (uint8_t*) rte_pktmbuf_mtod( p->m , struct rte_ether_hdr *); // Get the ptr
+            p->mbuf_wr_cnt=  p->mbuf_data_len_sz;
+        }
+
+        *p->my_fptr++ = *buf++;
+        p->mbuf_wr_cnt -- ;
+        buf_sz -- ;
+    }
+
+
+return 0;
+}
+
+int fs_mbuf_close( fs_mbuf_t * p )
+{
+ int l;
+    // fix data_len in the last mbuf
+    l  = p->mbuf_data_len_sz - p->mbuf_wr_cnt ;
+    p->m->data_len = l;
+    p->m_base->pkt_len += l;
+
+return 0;
+}
+
+
+
+
+
+
 
 
