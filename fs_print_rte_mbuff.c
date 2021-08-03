@@ -211,8 +211,11 @@ void print_rte_mbuf_pkt(int indent, struct rte_mbuf *m)
     uint16_t  eth_hdr_type;    // the 16 bits after the Mac Address
     void * l3;
     struct rte_ipv4_hdr *ipv4_hdr;
-    int shortflag=1;    // when dumping unrecognized packet types, limits size to 0x200
     INDENT(indent);
+    int i;
+    int done;
+    char string[256];
+    uint8_t * p; 
 
 //  the packet date
      eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
@@ -256,24 +259,22 @@ void print_rte_mbuf_pkt(int indent, struct rte_mbuf *m)
       }
       else
       {
-          if(m->next == NULL)
+          printf("%s unrecognized packet type: 0x%04x  size: %d \n",s,eth_hdr_type,rte_pktmbuf_pkt_len(m));
+          i = 0;
+          done = 0;
+          while (done == 0)
           {
-              printf("%s unrecognized packet type: 0x%04x  size: %d \n",s,eth_hdr_type,rte_pktmbuf_data_len(m));
-              if( (rte_pktmbuf_data_len(m) > 0x200 ) && (shortflag == 1 ))
-                  PrintBuff((uint8_t *)eth_hdr,0x200,0,"buf");
-              else
-                  PrintBuff((uint8_t *)eth_hdr,rte_pktmbuf_data_len(m),0,"buf");
-          }
-          else
-          {
+      
+               sprintf(string," Data for mbuf segment %d",i);
+               p = (((uint8_t*) m->buf_addr)  + m->data_off );
+               PrintBuff(p,m->data_len,p,string);
+               i++;
+               if (m->next == NULL) done =1;
+               m = m->next;
+          } 
+      
+          printf("\n end of %s\n",__FUNCTION__);
 
-              printf("%s unrecognized packet type: 0x%04x  1st data size: %d \n",s,eth_hdr_type,rte_pktmbuf_pkt_len(m));
-              if( (rte_pktmbuf_data_len(m) > 0x200 ) && (shortflag == 1 ))
-                  PrintBuff((uint8_t *)eth_hdr,0x200,0,"buf");
-              else
-                  PrintBuff((uint8_t *)eth_hdr,rte_pktmbuf_data_len(m),0,"buf");
-
-          }
       }
 }
 
@@ -352,6 +353,7 @@ int fs_mbuf_init( struct rte_mempool * pool, fs_mbuf_t * p )
 int fs_mbuf_add_buf(fs_mbuf_t * p, uint8_t * buf, int64_t buf_sz )
 {
    struct rte_mbuf * tmp_mbuf;
+   int l;
 
     while( buf_sz > 0 )
     {
@@ -380,21 +382,59 @@ int fs_mbuf_add_buf(fs_mbuf_t * p, uint8_t * buf, int64_t buf_sz )
         p->mbuf_wr_cnt -- ;
         buf_sz -- ;
     }
-
-
-return 0;
-}
-
-int fs_mbuf_close( fs_mbuf_t * p )
-{
- int l;
-    // fix data_len in the last mbuf
+    // the mbuf data_len  and base_mbuff pkt_len
     l  = p->mbuf_data_len_sz - p->mbuf_wr_cnt ;
     p->m->data_len = l;
     p->m_base->pkt_len += l;
 
 return 0;
 }
+
+int fs_mbuf_add_char_fill(fs_mbuf_t * p, uint8_t ch, int64_t sz )
+{
+   struct rte_mbuf * tmp_mbuf;
+   int l;
+
+    while( sz > 0 )
+    {
+        if(  p->mbuf_wr_cnt  <= 0)
+        {
+            // set the size of the data in the current mbuf
+            p->m->data_len       =  p->mbuf_data_len_sz  ;        // set mbuf data_len
+            p->m_base->pkt_len  +=  p->mbuf_data_len_sz  ;        // update pkt_total
+
+            tmp_mbuf =  rte_pktmbuf_alloc(p->pool);
+            if (tmp_mbuf == NULL )
+                   rte_exit(EXIT_FAILURE, "Not enough mbufs available B");
+ 
+            // increment the segs on the base mbuf.
+            p->m_base->nb_segs ++ ;
+            // sent the next pointer 
+            p->m->next =  tmp_mbuf;
+
+            p->m = tmp_mbuf;           
+            p->m->next = NULL ;                         // set next mbuf to null
+            p->my_fptr = (uint8_t*) rte_pktmbuf_mtod( p->m , struct rte_ether_hdr *); // Get the ptr
+            p->mbuf_wr_cnt=  p->mbuf_data_len_sz;
+        }
+
+        *p->my_fptr++ = ch;
+        p->mbuf_wr_cnt -- ;
+        sz -- ;
+    }
+    // the mbuf data_len  and base_mbuff pkt_len
+    l  = p->mbuf_data_len_sz - p->mbuf_wr_cnt ;
+    p->m->data_len = l;
+    p->m_base->pkt_len += l;
+
+
+return 0;
+}
+
+
+
+
+
 
 
 

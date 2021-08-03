@@ -1,6 +1,29 @@
 #ifndef _fs_extras_h
 #define _fs_extras_h
 
+
+/******************i*****/
+/*    Colors &  macros  */
+/************************/
+
+static const char C_RED[]     ={0x1b,'[','3','1','m',0x00}; /* RED    =$'\e[31m' */
+static const char C_GREEN[]   ={0x1b,'[','3','2','m',0x00}; /* GREEN  =$'\e[32m' */
+static const char C_YELLOW[]  ={0x1b,'[','3','3','m',0x00}; /* YELLOW =$'\e[33m' */
+static const char C_BLUE[]    ={0x1b,'[','3','4','m',0x00}; /* BLUE   =$'\e[34m' */
+static const char C_MAGENTA[] ={0x1b,'[','3','5','m',0x00}; /* MAGENTA=$'\e[34m' */
+static const char C_CYAN[]    ={0x1b,'[','3','6','m',0x00}; /* CYAN   =$'\e[36m' */
+static const char C_WHITE[]   ={0x1b,'[','3','7','m',0x00}; /* WHITE  =$'\e[37m' */
+static const char C_NORMAL[]  ={0x1b,'[','0','m',0x00};     /* NORMAL =$'\e[0m'  */
+
+
+#define FONT_GREEN()  printf("%s", C_GREEN);
+#define FONT_CYAN()   printf("%s", C_CYAN  );
+#define FONT_YELLOW() printf("%s", C_YELLOW);
+#define FONT_NORMAL() printf("%s", C_NORMAL);
+
+
+
+
 //#define LOOP_CALLS
 #undef LOOP_CALLS
 
@@ -8,7 +31,7 @@
 /*    WAI()         */
 /********************/
 #if 1
-#define WAI() printf("%d-%s:%s\n",__LINE__,__FILE__,__FUNCTION__)
+#define WAI() printf("%s%d-%s:%s%s\n",C_CYAN,__LINE__,__FILE__,__FUNCTION__,C_NORMAL)
 #else
 #define WAI()
 #endif
@@ -82,25 +105,6 @@ void print_xxx  (int indent,const char* string,int id,struct xxx *p)
    int iiiii;\
    for ( iiiii = 0 ; iiiii < (INDENT_SIZE * x) ; iiiii++) s[iiiii] = ' ';
 
-
-/******************i*****/
-/*    Colors &  macros  */
-/************************/
-
-static const char C_RED[]     ={0x1b,'[','3','1','m',0x00}; /* RED    =$'\e[31m' */
-static const char C_GREEN[]   ={0x1b,'[','3','2','m',0x00}; /* GREEN  =$'\e[32m' */
-static const char C_YELLOW[]  ={0x1b,'[','3','3','m',0x00}; /* YELLOW =$'\e[33m' */
-static const char C_BLUE[]    ={0x1b,'[','3','4','m',0x00}; /* BLUE   =$'\e[34m' */
-static const char C_MAGENTA[] ={0x1b,'[','3','5','m',0x00}; /* MAGENTA=$'\e[34m' */
-static const char C_CYAN[]    ={0x1b,'[','3','6','m',0x00}; /* CYAN   =$'\e[36m' */
-static const char C_WHITE[]   ={0x1b,'[','3','7','m',0x00}; /* WHITE  =$'\e[37m' */
-static const char C_NORMAL[]  ={0x1b,'[','0','m',0x00};     /* NORMAL =$'\e[0m'  */
-
-
-#define FONT_GREEN()  printf("%s", C_GREEN);
-#define FONT_CYAN()   printf("%s", C_CYAN  );
-#define FONT_YELLOW() printf("%s", C_YELLOW);
-#define FONT_NORMAL() printf("%s", C_NORMAL);
 
 
 #endif

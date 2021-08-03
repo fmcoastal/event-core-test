@@ -18,9 +18,6 @@ char * format_LE_ip_addr(char * str,uint32_t ip);
 char * format_rte_mac_addr(char * str,struct rte_ether_addr *m );
 
 
-
-
-
 /*
 #define INDENT_SIZE 3
 #define INDENT(x) \
@@ -28,7 +25,6 @@ char * format_rte_mac_addr(char * str,struct rte_ether_addr *m );
     int i;\
     for ( i = 0 ; i < (INDENT_SIZE * x) ; i++) s[i] = ' ';
 */
-
 
 /*
  *  dumps the packet data in an rte_mbuff to the screenxi
@@ -38,16 +34,12 @@ char * format_rte_mac_addr(char * str,struct rte_ether_addr *m );
  */
 void print_rte_mbuf(int indent, struct rte_mbuf *m);
 
-
-
 /*
  *  dumps the packet data in an rte_mbuff to the screenxi
  *
  *  https://doc.dpdk.org/guides/prog_guide/mbuf_lib.html
  */
 void print_rte_mbuf_pkt(int indent, struct rte_mbuf *m);
-
-
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -84,7 +76,7 @@ typedef struct fs_mbuf_struct {
 
 int fs_mbuf_init( struct rte_mempool * pool, fs_mbuf_t * p );
 int fs_mbuf_add_buf(fs_mbuf_t * p, uint8_t *buf, int64_t buf_sz );
-int fs_mbuf_close( fs_mbuf_t * p );
+int fs_mbuf_add_char_fill(fs_mbuf_t * p, uint8_t ch, int64_t sz );
 
 
 
