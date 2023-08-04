@@ -335,14 +335,20 @@ int i = 0;
 // returns 0 if the mac addresses are Identical
 int  CompareMAC(MacAddr_t* mac0, MacAddr_t* mac1)
 {
-   int i;
-   int flag = 0;
-   for( i = 0 ; ((i < 6) && (flag == 0)) ; i++)
-   {
-      if( mac0->addr[i] != mac1->addr[i] ) flag = 1;
-   }
-   return flag;
+   if (( ( mac0->addr[0] ) == (mac1->addr[0] )) &&
+       ( ( mac0->addr[1] ) == (mac1->addr[1] )) &&
+       ( ( mac0->addr[2] ) == (mac1->addr[2] )) &&
+       ( ( mac0->addr[3] ) == (mac1->addr[3] )) &&
+       ( ( mac0->addr[4] ) == (mac1->addr[4] )) &&
+       ( ( mac0->addr[5] ) == (mac1->addr[5] ))  )
+       {
+ //         printf(" %s Match\n",__FUNCTION__);
+            return 0;
+       }       
+ //     printf(" %s NO Match\n",__FUNCTION__);
+        return 1; 
 }
+
 
 
 void printMAC_Hdr_t(MAC_Hdr_t *hdr)
@@ -400,21 +406,21 @@ int GetMacData(uint8_t * pMACStart, MAC_Hdr_t *ExtractedData)
     ExtractedData->Q802_3 = 0;
     // looking at interframe gap or Q802.3 depending on value
     // unsigned short must be 16 bits for this to work
-    if( *((unsigned short*)pMACStart) == 0x0801)
+    if( *((unsigned short*)pMACStart) == SWAP_16(0x0801))
     {
         r += 4;
         ExtractedData->Q802_3 += 1;
         pMACStart+=2;
         ExtractedData->vlan_0 = *((unsigned short *)pMACStart);
         pMACStart+=2;
-    }
-    if( *((unsigned short*)pMACStart) == 0x0801)
-    {
-        r += 4;
-        ExtractedData->Q802_3 += 1;
-        pMACStart+=2;
-        ExtractedData->vlan_1 = *((unsigned short *)pMACStart);
-        pMACStart+=2;
+        if( *((unsigned short*)pMACStart) == SWAP_16(0x0801))
+        {
+            r += 4;
+            ExtractedData->Q802_3 += 1;
+            pMACStart+=2;
+            ExtractedData->vlan_1 = *((unsigned short *)pMACStart);
+            pMACStart+=2;
+        }
     }    
     ExtractedData->EtherType = *((unsigned short *)pMACStart);
     ExtractedData->hdr_sz =  r;
@@ -429,21 +435,20 @@ int GetMacHeaderSize(uint8_t * pMACStart)
 
     // First 12 bytes are destination and source MAC address
     // not clear if compiler will keep the MAC_Hdr_t data packed
-    r = 12;
+    r = 12 + 2 ;     // 2x Mac Addr + 1x EthType.
     pMACStart += 12;
     // looking at interframe gap or Q802.3 depending on value
     // unsigned short must be 16 bits for this to work
-    if( *((unsigned short*)pMACStart) == 0x0801)
+    if( *((unsigned short*)pMACStart) == SWAP_16(0x0801) )
     {
        r+=4;
        pMACStart += 4;
+       if( *((unsigned short*)pMACStart) == SWAP_16(0x0801))
+       {
+          r+=4;
+//        pMACStart += 4;
+       }
     }
-    if( *((unsigned short*)pMACStart) == 0x0801)
-    {
-       r+=4;
-       pMACStart += 4;
-    }
-    r += 2;  // InterFrame Gap
     return r;
 }
 
